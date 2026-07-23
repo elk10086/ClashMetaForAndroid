@@ -64,3 +64,5 @@ google-services.json
 
 # MacOS
 .DS_Store
+signing.credentials.local
+release.keystore.bak
