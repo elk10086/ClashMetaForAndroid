@@ -61,13 +61,17 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          touch signing.properties
-          echo keystore.password="$SIGNING_STORE_PASSWORD" > signing.properties
-          echo key.alias="$SIGNING_KEY_ALIAS" >> signing.properties
-          echo key.password="$SIGNING_KEY_PASSWORD" >> signing.properties
-            
-          echo "cat signing.properties"
-          cat signing.properties
+          if [ -z "$SIGNING_STORE_PASSWORD" ] || [ -z "$SIGNING_KEY_ALIAS" ] || [ -z "$SIGNING_KEY_PASSWORD" ]; then
+            echo "Missing signing secrets. Set SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD."
+            exit 1
+          fi
+          {
+            echo "keystore.password=$SIGNING_STORE_PASSWORD"
+            echo "key.alias=$SIGNING_KEY_ALIAS"
+            echo "key.password=$SIGNING_KEY_PASSWORD"
+          } > signing.properties
+          echo "signing.properties written"
+          keytool -list -keystore release.keystore -storepass "$SIGNING_STORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
 
       - name: Pre-release Build
         if: success()
@@ -75,6 +79,7 @@ jobs:
 
       # Delete old Prerelease-alpha
       - uses: dev-drprasad/delete-tag-and-release@v1.1
+        continue-on-error: true
         with:
           tag_name: Prerelease-alpha
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,9 +100,10 @@ jobs:
           files: app/build/outputs/apk/alpha/release/*
           prerelease: true
           generate_release_notes: true
+          fail_on_unmatched_files: true
 
       - name: Release Changelog Builder
-        uses: mikepenz/release-changelog-builder-action@v4
+        uses: mikepenz/release-changelog-builder-action@v5
         continue-on-error: true
         with:
           toTag: Prerelease-alpha

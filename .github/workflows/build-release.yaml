@@ -82,8 +82,9 @@ jobs:
             git config --global user.email 'action@github.com'
             git add build.gradle.kts
             git commit -am "Bump version to $newVersionName ($newVersionCode)"
-            git tag "v$newVersionName"
-            git push --follow-tags
+            git tag -f "v$newVersionName"
+            git push
+            git push -f origin "v$newVersionName"
           fi
 
       - name: Update CA
@@ -98,13 +99,17 @@ jobs:
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
-          touch signing.properties
-          echo keystore.password="$SIGNING_STORE_PASSWORD" > signing.properties
-          echo key.alias="$SIGNING_KEY_ALIAS" >> signing.properties
-          echo key.password="$SIGNING_KEY_PASSWORD" >> signing.properties
-            
-          echo "cat signing.properties"
-          cat signing.properties
+          if [ -z "$SIGNING_STORE_PASSWORD" ] || [ -z "$SIGNING_KEY_ALIAS" ] || [ -z "$SIGNING_KEY_PASSWORD" ]; then
+            echo "Missing signing secrets. Set SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD."
+            exit 1
+          fi
+          {
+            echo "keystore.password=$SIGNING_STORE_PASSWORD"
+            echo "key.alias=$SIGNING_KEY_ALIAS"
+            echo "key.password=$SIGNING_KEY_PASSWORD"
+          } > signing.properties
+          echo "signing.properties written"
+          keytool -list -keystore release.keystore -storepass "$SIGNING_STORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" >/dev/null
 
       - name: Release Build
         if: success()
@@ -118,15 +123,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: ${{ success() }}
         with:
           tag_name: ${{ inputs.release-tag }}
           files: app/build/outputs/apk/meta/release/*
           generate_release_notes: true
+          fail_on_unmatched_files: true
 
       - name: Release Changelog Builder
-        uses: mikepenz/release-changelog-builder-action@v4.1.1
+        uses: mikepenz/release-changelog-builder-action@v5
         continue-on-error: true
         with:
           toTag: ${{ inputs.release-tag }}
