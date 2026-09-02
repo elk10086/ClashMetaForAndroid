@@ -59,6 +59,13 @@
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".CloudAuthActivity"
+            android:configChanges="uiMode"
+            android:exported="false"
+            android:label="@string/cloud_login" />
+        <activity android:name=".CloudMineActivity" android:exported="false" android:label="@string/cloud_nav_mine" />
+        <activity android:name=".CloudBusinessActivity" android:exported="false" />
         <activity-alias
             android:name=".MainActivityAlias"
             android:exported="true"

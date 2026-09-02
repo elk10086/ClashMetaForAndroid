@@ -1,8 +1,8 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="PluralsCandidate">
-    <string name="launch_name_meta">Clash Meta</string>
-    <string name="launch_name_alpha">Clash Meta Alpha</string>
-    <string name="application_name_meta">Clash Meta for Android</string>
-    <string name="application_name_alpha">Clash Meta for Android Alpha</string>
+    <string name="launch_name_meta">ZY</string>
+    <string name="launch_name_alpha">ZY</string>
+    <string name="application_name_meta">ZY</string>
+    <string name="application_name_alpha">ZY</string>
 
     <string name="stopped">Stopped</string>
     <string name="tap_to_start">Tap to start</string>
@@ -370,4 +370,40 @@
     <string name="shortcut_start_long">Start Clash service</string>
     <string name="shortcut_stop_short">Stop Clash</string>
     <string name="shortcut_stop_long">Stop Clash service</string>
+    <string name="cloud_login">Sign in</string>
+    <string name="cloud_membership">Membership</string>
+    <string name="cloud_membership_loading">Loading membership…</string>
+    <string name="cloud_buy_now">Buy now</string>
+    <string name="cloud_connected">Connected</string>
+    <string name="cloud_disconnected">Disconnected</string>
+    <string name="cloud_brand" translatable="false">ZY</string>
+    <string name="cloud_slogan">Secure, stable and fast connection</string>
+    <string name="cloud_auth_email">Email</string>
+    <string name="cloud_auth_password">Password (at least 8 characters)</string>
+    <string name="cloud_auth_code">Email verification code</string>
+    <string name="cloud_auth_invite">Invitation code (optional)</string>
+    <string name="cloud_auth_send_code">Send code</string>
+    <string name="cloud_auth_login">Sign in</string>
+    <string name="cloud_auth_register">Register</string>
+    <string name="cloud_auth_forgot">Forgot password</string>
+    <string name="cloud_auth_welcome">Welcome back</string>
+    <string name="cloud_auth_register_title">Create account</string>
+    <string name="cloud_auth_reset_title">Reset password</string>
+    <string name="cloud_auth_register_submit">Register and sign in</string>
+    <string name="cloud_auth_reset_submit">Reset password</string>
+    <string name="cloud_nav_dashboard">Dashboard</string>
+    <string name="cloud_nav_lines">Lines</string>
+    <string name="cloud_nav_profiles">Profiles</string>
+    <string name="cloud_nav_mine">Me</string>
+    <string name="cloud_dashboard_mode">Outbound mode</string>
+    <string name="cloud_mode_rule_desc">Recommended. Local sites as usual; others accelerated</string>
+    <string name="cloud_mode_global_desc">Accelerate all websites</string>
+    <string name="cloud_mode_direct_desc">No acceleration, browse as usual</string>
+    <string name="cloud_dashboard_detection">Network detection</string>
+    <string name="cloud_dashboard_detection_hint">Tap to detect</string>
+    <string name="cloud_dashboard_detecting">Detecting…</string>
+    <string name="cloud_dashboard_detection_failed">Failed, tap to retry</string>
+    <string name="cloud_dashboard_detection_timeout">timeout</string>
+    <string name="cloud_dashboard_speed">Network traffic</string>
+    <string name="cloud_lines_connect_first">Start the connection to load lines</string>
 </resources>

@@ -1,154 +1,276 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto">
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
     <data>
-        <variable
-            name="self"
-            type="com.github.kr328.clash.design.MainDesign" />
-        <variable
-            name="clashRunning"
-            type="boolean" />
-        <variable
-            name="forwarded"
-            type="String" />
-        <variable
-            name="mode"
-            type="String" />
-        <variable
-            name="profileName"
-            type="String" />
-        <variable
-            name="colorClashStarted"
-            type="int" />
-        <variable
-            name="colorClashStopped"
-            type="int" />
-        <variable
-            name="hasProviders"
-            type="boolean" />
-
-        <import type="android.view.View" />
+        <variable name="self" type="com.github.kr328.clash.design.MainDesign" />
+        <variable name="clashRunning" type="boolean" />
+        <variable name="forwarded" type="String" />
+        <variable name="mode" type="String" />
+        <variable name="profileName" type="String" />
+        <variable name="lineName" type="String" />
+        <variable name="cloudPlan" type="String" />
+        <variable name="cloudExpiry" type="String" />
+        <variable name="cloudUsage" type="String" />
+        <variable name="cloudProgress" type="int" />
+        <variable name="networkResult" type="String" />
+        <variable name="uploadSpeed" type="String" />
+        <variable name="downloadSpeed" type="String" />
         <import type="com.github.kr328.clash.design.MainDesign.Request" />
     </data>
 
-    <androidx.coordinatorlayout.widget.CoordinatorLayout
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:background="#FAFAFA"
+        android:orientation="vertical"
         android:paddingStart="@{self.surface.insets.start}"
-        android:paddingEnd="@{self.surface.insets.end}">
+        android:paddingEnd="@{self.surface.insets.end}"
+        android:paddingTop="@{self.surface.insets.top}"
+        android:paddingBottom="@{self.surface.insets.bottom}">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center_vertical"
+                android:text="@string/cloud_nav_dashboard"
+                android:textColor="#212121"
+                android:textSize="20sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/cloud_dashboard_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:minWidth="72dp"
+                android:onClick="@{() -> self.request(Request.ToggleStatus)}"
+                android:paddingHorizontal="10dp"
+                android:text="@{clashRunning ? @string/cloud_connected : @string/cloud_disconnected}"
+                android:textColor="@{clashRunning ? 0xFF237A3B : 0xFFB3261E}"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:onClick="@{() -> self.request(Request.OpenPlans)}"
+                android:paddingHorizontal="8dp"
+                android:text="@string/cloud_buy_now"
+                android:textColor="#212121"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:fillViewport="true"
             android:scrollbars="none">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:animateLayoutChanges="true"
-                android:clipToPadding="false"
+                android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingHorizontal="@dimen/main_padding_horizontal"
-                android:paddingTop="@{self.surface.insets.top}"
-                android:paddingBottom="@{self.surface.insets.bottom}">
+                android:paddingHorizontal="18dp"
+                android:paddingTop="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:minHeight="112dp"
+                    android:background="@drawable/cloud_membership_card"
                     android:gravity="center_vertical"
-                    android:minHeight="@dimen/main_top_banner_height"
-                    android:orientation="horizontal">
-
-                    <FrameLayout
-                        android:layout_width="@dimen/large_item_header_layout_size"
-                        android:layout_height="@dimen/large_item_header_layout_size">
-
-                        <View
-                            android:layout_width="@dimen/main_logo_size"
-                            android:layout_height="@dimen/main_logo_size"
-                            android:layout_gravity="center"
-                            android:background="@drawable/ic_clash" />
-                    </FrameLayout>
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
                     <TextView
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="@string/application_name"
-                        android:textAppearance="@style/TextAppearance.MaterialComponents.Headline6" />
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:text="@{cloudPlan}"
+                        android:textColor="#212121"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:maxLines="1"
+                        android:text="@{cloudExpiry}"
+                        android:textColor="#757575"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@{cloudUsage}"
+                        android:textColor="#757575"
+                        android:textSize="13sp" />
+
+                    <ProgressBar
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="4dp"
+                        android:layout_marginTop="8dp"
+                        android:indeterminate="false"
+                        android:max="100"
+                        android:progress="@{cloudProgress}"
+                        android:progressTint="#212121"
+                        android:progressBackgroundTint="#A4ADBD" />
                 </LinearLayout>
 
-                <com.github.kr328.clash.design.view.LargeActionCard
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_card_margin_vertical"
+                <ImageView
+                    android:layout_width="136dp"
+                    android:layout_height="136dp"
+                    android:layout_marginTop="24dp"
+                    android:background="@{clashRunning ? @drawable/cloud_power_active : @drawable/cloud_power_inactive}"
+                    android:contentDescription="@string/tap_to_start"
+                    android:focusable="true"
+                    android:defaultFocusHighlightEnabled="true"
                     android:onClick="@{() -> self.request(Request.ToggleStatus)}"
-                    android:theme="@style/AppThemeDark"
-                    app:cardBackgroundColor="@{clashRunning ? colorClashStarted : colorClashStopped}"
-                    app:icon="@{clashRunning ? @drawable/ic_outline_check_circle : @drawable/ic_outline_not_interested}"
-                    app:subtext="@{clashRunning ? @string/format_traffic_forwarded(forwarded) : @string/tap_to_start}"
-                    app:text="@{clashRunning ? @string/running : @string/stopped}" />
+                    android:padding="44dp"
+                    android:src="@{clashRunning ? @drawable/cloud_pause : @drawable/cloud_play}"
+                    android:tint="#212121" />
 
-                <com.github.kr328.clash.design.view.LargeActionCard
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_card_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenProxy)}"
-                    android:visibility="@{clashRunning ? View.VISIBLE : View.GONE}"
-                    app:icon="@drawable/ic_baseline_apps"
-                    app:subtext="@{mode}"
-                    app:text="@string/proxy" />
+                    android:layout_height="96dp"
+                    android:layout_marginTop="16dp"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
 
-                <com.github.kr328.clash.design.view.LargeActionCard
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_card_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenProfiles)}"
-                    app:icon="@drawable/ic_baseline_view_list"
-                    app:subtext="@{profileName != null ? @string/format_profile_activated(profileName) : @string/not_selected}"
-                    app:text="@string/profile" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/cloud_dashboard_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:defaultFocusHighlightEnabled="true"
+                        android:gravity="center_vertical"
+                        android:onClick="@{() -> self.showModeSelector()}"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_mode" android:textColor="#757575" android:textSize="12sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="@{mode}" android:textColor="#212121" android:textSize="16sp" android:textStyle="bold" />
+                    </LinearLayout>
 
-                <com.github.kr328.clash.design.view.LargeActionLabel
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:layout_marginVertical="@dimen/main_label_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenProviders)}"
-                    android:visibility="@{clashRunning &amp;&amp; hasProviders ? View.VISIBLE : View.GONE}"
-                    app:icon="@drawable/ic_baseline_swap_vertical_circle"
-                    app:text="@string/providers" />
+                    <Space android:layout_width="12dp" android:layout_height="match_parent" />
 
-                <com.github.kr328.clash.design.view.LargeActionLabel
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_label_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenLogs)}"
-                    app:icon="@drawable/ic_baseline_assignment"
-                    app:text="@string/logs" />
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1"
+                        android:background="@drawable/cloud_dashboard_card"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:defaultFocusHighlightEnabled="true"
+                        android:gravity="center_vertical"
+                        android:onClick="@{() -> self.request(Request.OpenProxy)}"
+                        android:orientation="vertical"
+                        android:padding="14dp">
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cloud_nav_lines" android:textColor="#757575" android:textSize="12sp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{lineName}" android:textColor="#212121" android:textSize="16sp" android:textStyle="bold" />
+                    </LinearLayout>
+                </LinearLayout>
 
-                <com.github.kr328.clash.design.view.LargeActionLabel
+                <LinearLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_label_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenSettings)}"
-                    app:icon="@drawable/ic_baseline_settings"
-                    app:text="@string/settings" />
-
-                <com.github.kr328.clash.design.view.LargeActionLabel
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_label_margin_vertical"
-                    android:visibility="gone"
-                    android:onClick="@{() -> self.request(Request.OpenHelp)}"
-                    app:icon="@drawable/ic_baseline_help_center"
-                    app:text="@string/help" />
-
-                <com.github.kr328.clash.design.view.LargeActionLabel
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="@dimen/main_label_margin_vertical"
-                    android:onClick="@{() -> self.request(Request.OpenAbout)}"
-                    app:icon="@drawable/ic_baseline_info"
-                    app:text="@string/about" />
+                    android:layout_height="96dp"
+                    android:layout_marginTop="12dp"
+                    android:orientation="horizontal"
+                    android:weightSum="2">
+                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:clickable="true" android:focusable="true" android:defaultFocusHighlightEnabled="true" android:gravity="center_vertical" android:onClick="@{() -> self.request(Request.DetectNetwork)}" android:orientation="vertical" android:padding="14dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_detection" android:textColor="#757575" android:textSize="12sp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{networkResult}" android:textColor="#212121" android:textSize="15sp" android:textStyle="bold" />
+                    </LinearLayout>
+                    <Space android:layout_width="12dp" android:layout_height="match_parent" />
+                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:gravity="center_vertical" android:orientation="vertical" android:padding="14dp">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_speed" android:textColor="#757575" android:textSize="12sp" />
+                        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↑ " + uploadSpeed}' android:textColor="#212121" android:textSize="13sp" android:textStyle="bold" />
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↓ " + downloadSpeed}' android:textColor="#212121" android:textSize="13sp" android:textStyle="bold" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
             </LinearLayout>
         </ScrollView>
-    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="80dp"
+            android:background="#F3F3F3"
+            android:gravity="center"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView android:layout_width="64dp" android:layout_height="32dp" android:background="@drawable/cloud_nav_indicator" android:padding="20dp" android:src="@drawable/cloud_nav_dashboard_selected" android:contentDescription="@string/cloud_nav_dashboard" />
+                <TextView android:layout_width="match_parent" android:layout_height="24dp" android:gravity="center" android:text="@string/cloud_nav_dashboard" android:textColor="#212121" android:textSize="12sp" android:textStyle="bold" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:onClick="@{() -> self.request(Request.OpenProxy)}"
+                android:orientation="vertical">
+                <ImageView android:layout_width="64dp" android:layout_height="32dp" android:padding="20dp" android:src="@drawable/cloud_nav_lines" android:contentDescription="@string/cloud_nav_lines" />
+                <TextView android:layout_width="match_parent" android:layout_height="24dp" android:gravity="center" android:text="@string/cloud_nav_lines" android:textColor="#8B91A2" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:onClick="@{() -> self.request(Request.OpenProfiles)}"
+                android:orientation="vertical">
+                <ImageView android:layout_width="64dp" android:layout_height="32dp" android:padding="20dp" android:src="@drawable/cloud_nav_profiles" android:contentDescription="@string/cloud_nav_profiles" />
+                <TextView android:layout_width="match_parent" android:layout_height="24dp" android:gravity="center" android:text="@string/cloud_nav_profiles" android:textColor="#8B91A2" android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:onClick="@{() -> self.request(Request.OpenSettings)}"
+                android:orientation="vertical">
+                <ImageView android:layout_width="64dp" android:layout_height="32dp" android:padding="20dp" android:src="@drawable/cloud_nav_mine" android:contentDescription="@string/cloud_nav_mine" />
+                <TextView android:layout_width="match_parent" android:layout_height="24dp" android:gravity="center" android:text="@string/cloud_nav_mine" android:textColor="#8B91A2" android:textSize="12sp" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
 </layout>
