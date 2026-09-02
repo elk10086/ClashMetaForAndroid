@@ -50,6 +50,7 @@ import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.design.R as DesignR
 
 class MainActivity : BaseActivity<MainDesign>() {
+    private val connectionClock by lazy { getSharedPreferences("cloud_connection_clock", MODE_PRIVATE) }
     private val subscriptionMutex = Mutex()
     private val networkDetectionMutex = Mutex()
     private var cloudSubscription: CloudSubscription? = null
@@ -81,6 +82,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                         Event.ServiceRecreated,
                         Event.ClashStop, Event.ClashStart,
                         Event.ProfileLoaded, Event.ProfileChanged -> {
+                            syncConnectionClock()
                             design.fetch()
                             if (it == Event.ActivityStart ||
                                 it == Event.ClashStop ||
@@ -113,9 +115,11 @@ class MainActivity : BaseActivity<MainDesign>() {
                 design.requests.onReceive {
                     when (it) {
                         MainDesign.Request.ToggleStatus -> {
-                            if (clashRunning)
+                            if (clashRunning) {
+                                clearConnectionClock()
                                 stopClashService()
-                            else {
+                            } else {
+                                startConnectionClock()
                                 stopPreviewCore()
                                 delay(400)
                                 design.startClash()
@@ -166,7 +170,9 @@ class MainActivity : BaseActivity<MainDesign>() {
     }
 
     private suspend fun MainDesign.fetch() {
+        syncConnectionClock()
         setClashRunning(clashRunning)
+        setConnectionTime(formatConnectionTime())
         setNetworkResult(getString(DesignR.string.cloud_dashboard_detection_hint))
 
         val state = withClash {
@@ -296,10 +302,41 @@ class MainActivity : BaseActivity<MainDesign>() {
     }
 
     private suspend fun MainDesign.fetchTraffic() {
+        setConnectionTime(formatConnectionTime())
         withClash {
             setForwarded(queryTrafficTotal())
             setTrafficSpeed(queryTrafficNow())
         }
+    }
+
+    private fun syncConnectionClock() {
+        if (clashRunning) {
+            if (connectionClock.getLong("started_at", 0L) <= 0L) startConnectionClock()
+        } else {
+            clearConnectionClock()
+        }
+    }
+
+    private fun startConnectionClock() {
+        if (connectionClock.getLong("started_at", 0L) <= 0L) {
+            connectionClock.edit().putLong("started_at", System.currentTimeMillis()).apply()
+        }
+    }
+
+    private fun clearConnectionClock() {
+        connectionClock.edit().remove("started_at").apply()
+    }
+
+    private fun formatConnectionTime(): String {
+        if (!clashRunning) return "00:00:00"
+        val startedAt = connectionClock.getLong("started_at", 0L)
+        if (startedAt <= 0L) return "00:00:00"
+        val elapsed = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
+        if (elapsed >= 100L * 3600L) return "99:59:59"
+        val hours = elapsed / 3600L
+        val minutes = elapsed / 60L % 60L
+        val seconds = elapsed % 60L
+        return String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
     private suspend fun detectNetwork(design: MainDesign) {

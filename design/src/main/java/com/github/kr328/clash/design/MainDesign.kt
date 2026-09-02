@@ -83,6 +83,10 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.downloadSpeed = value.trafficDownload() + "/s"
     }
 
+    suspend fun setConnectionTime(value: String) = withContext(Dispatchers.Main) {
+        binding.connectionTime = value
+    }
+
     suspend fun setCloudAccount(plan: String, expiry: String, usage: String, progress: Int) {
         withContext(Dispatchers.Main) {
             binding.cloudPlan = plan
@@ -97,6 +101,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.networkResult = context.getString(R.string.cloud_dashboard_detection_hint)
         binding.uploadSpeed = "0 Bytes/s"
         binding.downloadSpeed = "0 Bytes/s"
+        binding.connectionTime = "00:00:00"
         binding.cloudPlan = context.getString(R.string.cloud_membership_loading)
         binding.cloudExpiry = ""
         binding.cloudUsage = ""
