@@ -8,6 +8,8 @@ import com.github.kr328.clash.design.model.ProxyState
 import com.github.kr328.clash.util.withClash
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -28,6 +30,9 @@ class ProxyActivity : BaseActivity<ProxyDesign>() {
         )
 
         setContentDesign(design)
+        withContext(Dispatchers.Main) {
+            CloudBottomNavigation.attach(this@ProxyActivity, CloudBottomNavigation.Tab.LINES)
+        }
 
         design.requests.send(ProxyDesign.Request.ReloadAll)
 

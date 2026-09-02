@@ -116,7 +116,6 @@ class CloudMineActivity : AppCompatActivity() {
         }
         startActivity(Intent(this, target).addFlags(flags))
         overridePendingTransition(0, 0)
-        if (target != MainActivity::class.java) finish()
     }
 
     private fun vipBanner(): View = LinearLayout(this).apply {

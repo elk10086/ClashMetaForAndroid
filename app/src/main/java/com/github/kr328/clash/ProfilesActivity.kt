@@ -25,6 +25,9 @@ class ProfilesActivity : BaseActivity<ProfilesDesign>() {
         val design = ProfilesDesign(this)
 
         setContentDesign(design)
+        withContext(Dispatchers.Main) {
+            CloudBottomNavigation.attach(this@ProfilesActivity, CloudBottomNavigation.Tab.PROFILES)
+        }
 
         val ticker = ticker(TimeUnit.MINUTES.toMillis(1))
 
