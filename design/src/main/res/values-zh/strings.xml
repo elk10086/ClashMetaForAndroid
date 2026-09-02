@@ -326,6 +326,8 @@
     <string name="cloud_logout_confirm">确定退出登录并清除本地云订阅和配置吗？</string>
     <string name="cloud_logout_progress_title">正在安全退出</string>
     <string name="cloud_logout_progress_message">正在清理本地线路和配置，请勿关闭客户端。</string>
+    <string name="cloud_test_accounts">测试账号</string>
+    <string name="cloud_test_account_selected">已填入测试邮箱，请输入对应密码登录</string>
     <string name="cloud_nav_dashboard">仪表盘</string>
     <string name="cloud_nav_lines">线路</string>
     <string name="cloud_nav_profiles">配置</string>

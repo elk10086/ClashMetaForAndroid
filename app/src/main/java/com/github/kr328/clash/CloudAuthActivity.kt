@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
+import com.github.kr328.clash.cloud.CloudTestAccount
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.github.kr328.clash.design.R as DesignR
@@ -32,6 +33,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private var invite = ""
     private var resetting = false
     private var busy = false
+    private var lastBrandTapAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -75,6 +77,13 @@ class CloudAuthActivity : AppCompatActivity() {
             addView(TextView(this@CloudAuthActivity).apply {
                 text = getString(DesignR.string.cloud_brand); gravity = Gravity.CENTER; textSize = 32f
                 setTypeface(typeface, Typeface.BOLD); setTextColor(foreground()); letterSpacing = .08f
+                setOnClickListener {
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    if (now - lastBrandTapAt <= 500L) {
+                        lastBrandTapAt = 0L
+                        showTestAccounts(mail)
+                    } else lastBrandTapAt = now
+                }
             })
             addView(link(getString(DesignR.string.cloud_official_site)) {
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://zhuiyun.one"))) }
@@ -186,6 +195,18 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun rounded(color: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(dp(1), it) } }
     private fun runBusy(block: suspend () -> Unit) { if (busy) return; busy = true; lifecycleScope.launch { try { block() } catch (e: Throwable) { toast(e.message ?: getString(DesignR.string.cloud_operation_failed)) } finally { busy = false } } }
     private fun validEmail(value: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(value).matches()
+    private fun showTestAccounts(emailField: EditText) {
+        val accounts = CloudTestAccount.emails.toTypedArray()
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(DesignR.string.cloud_test_accounts)
+            .setItems(accounts) { _, index ->
+                emailField.setText(accounts[index])
+                emailField.setSelection(emailField.length())
+                toast(getString(DesignR.string.cloud_test_account_selected))
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun backgroundColor() = if (isDark()) Color.rgb(23, 23, 35) else Color.rgb(250, 250, 252)

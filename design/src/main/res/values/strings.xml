@@ -417,6 +417,8 @@
     <string name="cloud_logout_confirm">Sign out and remove the local cloud subscription and configuration?</string>
     <string name="cloud_logout_progress_title">Signing out safely</string>
     <string name="cloud_logout_progress_message">Removing local routes and configuration. Do not close the app.</string>
+    <string name="cloud_test_accounts">Test accounts</string>
+    <string name="cloud_test_account_selected">Test email filled. Enter its password to sign in.</string>
     <string name="cloud_nav_dashboard">Dashboard</string>
     <string name="cloud_nav_lines">Lines</string>
     <string name="cloud_nav_profiles">Profiles</string>
