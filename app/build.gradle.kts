@@ -1,4 +1,5 @@
 import java.net.URL
+import java.net.HttpURLConnection
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
@@ -36,23 +37,55 @@ val geoFilesDownloadDir = "src/main/assets"
 
 task("downloadGeoFiles") {
 
-    val geoFilesUrls = mapOf(
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb" to "geoip.metadb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat" to "geosite.dat",
-        // "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/country.mmdb" to "country.mmdb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb" to "ASN.mmdb",
-        "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/BundleMRS.7z" to "BundleMRS.7z",
+    val geoFiles = mapOf(
+        "geoip.metadb" to "geoip.metadb",
+        "geosite.dat" to "geosite.dat",
+        "GeoLite2-ASN.mmdb" to "ASN.mmdb",
+        "BundleMRS.7z" to "BundleMRS.7z",
     )
 
     doLast {
-        geoFilesUrls.forEach { (downloadUrl, outputFileName) ->
-            val url = URL(downloadUrl)
+        geoFiles.forEach { (remoteFileName, outputFileName) ->
             val outputPath = file("$geoFilesDownloadDir/$outputFileName")
             outputPath.parentFile.mkdirs()
-            url.openStream().use { input ->
-                Files.copy(input, outputPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                println("$outputFileName downloaded to $outputPath")
+
+            // Keep a previously downloaded non-empty file when the network is unavailable.
+            if (outputPath.isFile && outputPath.length() > 1024L) {
+                println("$outputFileName already exists, skipping download")
+                return@forEach
             }
+
+            val candidates = listOf(
+                "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/$remoteFileName",
+                "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/release/$remoteFileName",
+            )
+            val temporaryPath = file("${outputPath.absolutePath}.download")
+            var lastFailure: Throwable? = null
+
+            for (downloadUrl in candidates) {
+                try {
+                    println("Downloading $outputFileName from $downloadUrl")
+                    val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+                    connection.instanceFollowRedirects = true
+                    connection.connectTimeout = 15_000
+                    connection.readTimeout = 120_000
+                    connection.setRequestProperty("User-Agent", "ClashMetaForAndroid-Gradle")
+                    connection.inputStream.use { input ->
+                        Files.copy(input, temporaryPath.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                    }
+                    connection.disconnect()
+                    check(temporaryPath.length() > 1024L) { "$outputFileName download is empty or incomplete" }
+                    Files.move(temporaryPath.toPath(), outputPath.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                    println("$outputFileName downloaded to $outputPath")
+                    lastFailure = null
+                    break
+                } catch (failure: Throwable) {
+                    lastFailure = failure
+                    temporaryPath.delete()
+                    logger.warn("Failed to download $outputFileName from $downloadUrl: ${failure.message}")
+                }
+            }
+            if (lastFailure != null) throw GradleException("Unable to download $outputFileName from all official sources", lastFailure)
         }
     }
 }
