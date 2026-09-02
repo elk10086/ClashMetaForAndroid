@@ -8,6 +8,7 @@ class CloudSession(context: Context) {
     val loggedIn: Boolean get() = authData.isNotBlank()
     val authData: String get() = prefs.getString("auth_data", "").orEmpty()
     val email: String get() = prefs.getString("email", "").orEmpty()
+    val isTestAccount: Boolean get() = CloudTestAccount.isTest(email)
     var profileUuid: String?
         get() = prefs.getString("profile_uuid", null)
         set(value) { prefs.edit().putString("profile_uuid", value).apply() }
@@ -21,7 +22,6 @@ class CloudSession(context: Context) {
     }
 
     fun clear() {
-        val profile = profileUuid
-        prefs.edit().clear().putString("profile_uuid", profile).apply()
+        prefs.edit().clear().apply()
     }
 }

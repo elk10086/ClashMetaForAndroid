@@ -22,7 +22,11 @@ import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudReleaseManager
+import com.github.kr328.clash.util.stopClashService
+import com.github.kr328.clash.util.withProfile
+import java.util.UUID
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 import com.github.kr328.clash.design.R as DesignR
@@ -65,6 +69,8 @@ class CloudMineActivity : AppCompatActivity() {
             addView(actionRow("设置") {
                 startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
             })
+            addView(View(this@CloudMineActivity), LinearLayout.LayoutParams(1, dp(24)))
+            addView(logoutButton())
         }
         setContentView(vertical().apply {
             addView(ScrollView(this@CloudMineActivity).apply { addView(root) }, LinearLayout.LayoutParams(-1, 0, 1f))
@@ -84,6 +90,51 @@ class CloudMineActivity : AppCompatActivity() {
     private fun open(type: String) = startActivity(
         Intent(this, CloudBusinessActivity::class.java).putExtra("type", type),
     )
+
+    private fun logoutButton(): View = TextView(this).apply {
+        text = getString(DesignR.string.cloud_logout)
+        textSize = 15f
+        gravity = Gravity.CENTER
+        setTextColor(Color.WHITE)
+        background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Color.parseColor("#3257FF"), Color.parseColor("#24D4F3"))).apply {
+            cornerRadius = dp(25).toFloat()
+        }
+        setOnClickListener { confirmLogout() }
+    }.also { it.layoutParams = LinearLayout.LayoutParams(dp(200), dp(50)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(12); bottomMargin = dp(20) } }
+
+    private fun confirmLogout() {
+        AlertDialog.Builder(this)
+            .setTitle(DesignR.string.cloud_logout)
+            .setMessage(DesignR.string.cloud_logout_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ -> performLogout() }
+            .show()
+    }
+
+    private fun performLogout() {
+        val progress = AlertDialog.Builder(this)
+            .setTitle(DesignR.string.cloud_logout_progress_title)
+            .setMessage(DesignR.string.cloud_logout_progress_message)
+            .setCancelable(false)
+            .show()
+        lifecycleScope.launch {
+            val session = CloudSession(this@CloudMineActivity)
+            val profileId = session.profileUuid
+            stopClashService()
+            delay(500)
+            runCatching {
+                profileId?.let { id -> withProfile { delete(UUID.fromString(id)) } }
+            }
+            session.clear()
+            getSharedPreferences("cloud_config", MODE_PRIVATE).edit().clear().apply()
+            getSharedPreferences("cloud_connection_clock", MODE_PRIVATE).edit().clear().apply()
+            progress.dismiss()
+            val login = Intent(this@CloudMineActivity, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(login)
+            finish()
+        }
+    }
 
     private fun bottomNavigation(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER

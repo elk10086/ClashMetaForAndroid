@@ -322,6 +322,10 @@
     <string name="cloud_register_success">注册成功</string>
     <string name="cloud_reset_success">重置密码成功</string>
     <string name="cloud_operation_failed">操作失败</string>
+    <string name="cloud_logout">退出登录</string>
+    <string name="cloud_logout_confirm">确定退出登录并清除本地云订阅和配置吗？</string>
+    <string name="cloud_logout_progress_title">正在安全退出</string>
+    <string name="cloud_logout_progress_message">正在清理本地线路和配置，请勿关闭客户端。</string>
     <string name="cloud_nav_dashboard">仪表盘</string>
     <string name="cloud_nav_lines">线路</string>
     <string name="cloud_nav_profiles">配置</string>
