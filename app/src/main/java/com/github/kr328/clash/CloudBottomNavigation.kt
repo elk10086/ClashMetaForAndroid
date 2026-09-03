@@ -2,7 +2,6 @@ package com.github.kr328.clash
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Color
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
@@ -13,6 +12,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.github.kr328.clash.design.util.resolveThemedColor
 import com.github.kr328.clash.design.R as DesignR
 
 /** Activity-backed equivalent of hle_fi's persistent four-destination NavigationBar. */
@@ -78,7 +78,7 @@ object CloudBottomNavigation {
         tag = "cloud_bottom_navigation"
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER
-        setBackgroundColor(Color.rgb(243, 243, 243))
+        setBackgroundColor(activity.resolveThemedColor(com.google.android.material.R.attr.colorSurface))
         add(Tab.DASHBOARD, DesignR.string.cloud_nav_dashboard, DesignR.drawable.cloud_nav_dashboard, selected == Tab.DASHBOARD)
         add(Tab.LINES, DesignR.string.cloud_nav_lines, DesignR.drawable.cloud_nav_lines, selected == Tab.LINES)
         add(Tab.PROFILES, DesignR.string.cloud_nav_profiles, DesignR.drawable.cloud_nav_profiles, selected == Tab.PROFILES)
@@ -94,7 +94,8 @@ object CloudBottomNavigation {
             setOnClickListener { open(context as Activity, tab) }
             addView(ImageView(context).apply {
                 setImageResource(icon)
-                setColorFilter(Color.parseColor(if (active) "#212121" else "#8B91A2"))
+                setColorFilter(context.resolveThemedColor(if (active) com.google.android.material.R.attr.colorPrimary else com.google.android.material.R.attr.colorOnSurface))
+                alpha = if (active) 1f else .62f
                 if (active) setBackgroundResource(DesignR.drawable.cloud_nav_indicator)
                 setPadding(dp(context, 20), dp(context, 4), dp(context, 20), dp(context, 4))
             }, LinearLayout.LayoutParams(dp(context, 64), dp(context, 32)))
@@ -102,7 +103,8 @@ object CloudBottomNavigation {
                 setText(label)
                 textSize = 12f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor(if (active) "#212121" else "#8B91A2"))
+                setTextColor(context.resolveThemedColor(if (active) com.google.android.material.R.attr.colorPrimary else com.google.android.material.R.attr.colorOnSurface))
+                alpha = if (active) 1f else .62f
                 if (active) setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(-1, dp(context, 24)))
         }, LinearLayout.LayoutParams(0, -1, 1f))

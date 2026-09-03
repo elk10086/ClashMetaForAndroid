@@ -16,6 +16,7 @@ import com.github.kr328.clash.core.util.trafficDownload
 import com.github.kr328.clash.design.databinding.DesignMainBinding
 import com.github.kr328.clash.design.util.layoutInflater
 import com.github.kr328.clash.design.util.root
+import com.github.kr328.clash.design.util.resolveThemedColor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.google.android.material.bottomsheet.BottomSheetDialog
@@ -124,17 +125,17 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(8), dp(16), dp(20))
-            background = background(Color.WHITE, 16)
+            background = background(context.resolveThemedColor(com.google.android.material.R.attr.colorSurface), 16)
         }
         content.addView(View(context).apply {
-            background = background(Color.parseColor("#D5D5D5"), 2)
+            background = background(context.resolveThemedColor(com.google.android.material.R.attr.colorOutline), 2)
         }, LinearLayout.LayoutParams(dp(36), dp(4)).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             bottomMargin = dp(12)
         })
         content.addView(TextView(context).apply {
             setText(R.string.cloud_dashboard_mode)
-            setTextColor(Color.parseColor("#212121"))
+            setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface))
             textSize = 18f
             setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -153,7 +154,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), dp(10), dp(8), dp(10))
                 background = background(
-                    if (selected) Color.parseColor("#F0F0F0") else Color.parseColor("#FAFAFA"),
+                    if (selected) context.resolveThemedColor(com.google.android.material.R.attr.colorPrimary) else context.resolveThemedColor(com.google.android.material.R.attr.colorSurface),
                     12,
                 )
                 isClickable = true
@@ -163,13 +164,14 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(context).apply {
                     setText(title)
-                    setTextColor(Color.parseColor("#212121"))
+                    setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface))
                     textSize = 16f
                     setTypeface(typeface, Typeface.BOLD)
                 })
                 addView(TextView(context).apply {
                     setText(description)
-                    setTextColor(Color.parseColor("#757575"))
+                    setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface))
+                    alpha = .65f
                     textSize = 13f
                     setPadding(0, dp(3), 0, 0)
                 })

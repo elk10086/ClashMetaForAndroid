@@ -4,6 +4,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
@@ -24,6 +25,9 @@ import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudTestAccount
 import com.github.kr328.clash.cloud.CloudReleaseManager
+import com.github.kr328.clash.design.model.DarkMode
+import com.github.kr328.clash.design.store.UiStore
+import com.github.kr328.clash.design.util.resolveThemedColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.github.kr328.clash.design.R as DesignR
@@ -40,6 +44,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private var lastBrandTapAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        applySelectedTheme()
         super.onCreate(savedInstanceState)
         if (CloudSession(this).loggedIn) return finish()
         window.statusBarColor = backgroundColor()
@@ -93,7 +98,7 @@ class CloudAuthActivity : AppCompatActivity() {
             layoutParams = lp(minOf(resources.displayMetrics.widthPixels - dp(56), dp(440)), -2)
             addView(TextView(this@CloudAuthActivity).apply {
                 text = BuildConfig.BRAND_DISPLAY_NAME; gravity = Gravity.CENTER; textSize = 32f
-                typeface = Typeface.create("sans-serif-black", Typeface.BOLD); setTextColor(foreground()); letterSpacing = .08f
+                typeface = themeTypeface(Typeface.BOLD); setTextColor(foreground()); letterSpacing = .08f
                 setOnClickListener {
                     val now = android.os.SystemClock.elapsedRealtime()
                     if (now - lastBrandTapAt <= 500L) {
@@ -213,7 +218,7 @@ class CloudAuthActivity : AppCompatActivity() {
 
     private fun input(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
         this.hint = hint; inputType = type; textSize = 16f; setTextColor(foreground()); setHintTextColor(secondary())
-        isSingleLine = true; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        isSingleLine = true; typeface = themeTypeface(Typeface.NORMAL)
         background = rounded(surface(), 16, outline()); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58))
     }
 
@@ -267,13 +272,34 @@ class CloudAuthActivity : AppCompatActivity() {
     }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    private fun backgroundColor() = if (isDark()) Color.rgb(10, 10, 10) else Color.WHITE
-    private fun surface() = if (isDark()) Color.rgb(28, 28, 28) else Color.rgb(248, 248, 248)
-    private fun foreground() = if (isDark()) Color.WHITE else Color.rgb(16, 16, 16)
-    private fun secondary() = if (isDark()) Color.rgb(174, 174, 174) else Color.rgb(98, 98, 98)
-    private fun outline() = if (isDark()) Color.rgb(66, 66, 66) else Color.rgb(224, 224, 224)
-    private fun accent() = if (isDark()) Color.WHITE else Color.BLACK
-    private fun onAccent() = if (isDark()) Color.BLACK else Color.WHITE
-    private fun isDark() = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    private fun backgroundColor() = resolveThemedColor(android.R.attr.windowBackground)
+    private fun surface() = resolveThemedColor(com.google.android.material.R.attr.colorSurface)
+    private fun foreground() = resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+    private fun secondary() = blend(foreground(), backgroundColor(), .38f)
+    private fun outline() = blend(foreground(), backgroundColor(), .72f)
+    private fun accent() = resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+    private fun onAccent() = resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
+    private fun isDark(): Boolean = when (UiStore(this).darkMode) {
+        DarkMode.ForceDark -> true
+        DarkMode.ForceLight -> false
+        DarkMode.Auto -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    }
+    private fun applySelectedTheme() {
+        val store = UiStore(this)
+        setTheme(if (isDark()) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
+        theme.applyStyle(when (store.cloudThemeStyle) {
+            1 -> DesignR.style.CloudThemeSakura
+            2 -> DesignR.style.CloudThemeGod
+            3 -> DesignR.style.CloudThemeAnime
+            else -> DesignR.style.CloudThemeMinimal
+        }, true)
+        if (isDark() && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
+    }
+    private fun themeTypeface(style: Int): Typeface = Typeface.create(when (UiStore(this).cloudThemeStyle) {
+        1 -> "sans-serif-condensed"
+        2 -> "sans-serif-light"
+        3 -> "sans-serif"
+        else -> "sans-serif-rounded"
+    }, style)
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }

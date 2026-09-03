@@ -21,7 +21,7 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#FAFAFA"
+        android:background="?android:attr/windowBackground"
         android:orientation="vertical"
         android:paddingStart="@{self.surface.insets.start}"
         android:paddingEnd="@{self.surface.insets.end}"
@@ -40,7 +40,7 @@
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:text="@string/cloud_nav_dashboard"
-                android:textColor="#212121"
+                android:textColor="?attr/colorControlNormal"
                 android:textSize="20sp"
                 android:textStyle="bold" />
 
@@ -69,7 +69,7 @@
                 android:onClick="@{() -> self.request(Request.OpenPlans)}"
                 android:paddingHorizontal="8dp"
                 android:text="@string/cloud_buy_now"
-                android:textColor="#212121"
+                android:textColor="?attr/colorControlNormal"
                 android:textSize="13sp"
                 android:textStyle="bold" />
         </LinearLayout>
@@ -108,7 +108,7 @@
                         android:ellipsize="end"
                         android:maxLines="2"
                         android:text="@{cloudPlan}"
-                        android:textColor="#212121"
+                        android:textColor="?attr/colorControlNormal"
                         android:textSize="16sp"
                         android:textStyle="bold" />
 
@@ -118,7 +118,8 @@
                         android:layout_marginTop="6dp"
                         android:maxLines="1"
                         android:text="@{cloudExpiry}"
-                        android:textColor="#757575"
+                        android:textColor="?attr/colorControlNormal"
+                        android:alpha="0.65"
                         android:textSize="13sp" />
 
                     <TextView
@@ -128,7 +129,8 @@
                         android:ellipsize="end"
                         android:maxLines="1"
                         android:text="@{cloudUsage}"
-                        android:textColor="#757575"
+                        android:textColor="?attr/colorControlNormal"
+                        android:alpha="0.65"
                         android:textSize="13sp" />
 
                     <ProgressBar
@@ -139,8 +141,8 @@
                         android:indeterminate="false"
                         android:max="100"
                         android:progress="@{cloudProgress}"
-                        android:progressTint="#212121"
-                        android:progressBackgroundTint="#A4ADBD" />
+                        android:progressTint="?attr/colorPrimary"
+                        android:progressBackgroundTint="?attr/colorControlHighlight" />
                 </LinearLayout>
 
                 <ImageView
@@ -154,14 +156,14 @@
                     android:onClick="@{() -> self.request(Request.ToggleStatus)}"
                     android:padding="44dp"
                     android:src="@{clashRunning ? @drawable/cloud_pause : @drawable/cloud_play}"
-                    android:tint="#212121" />
+                    android:tint="?attr/colorControlNormal" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
                     android:text="@{connectionTime}"
-                    android:textColor="#212121"
+                    android:textColor="?attr/colorControlNormal"
                     android:textSize="24sp"
                     android:textStyle="bold" />
 
@@ -184,8 +186,8 @@
                         android:onClick="@{() -> self.showModeSelector()}"
                         android:orientation="vertical"
                         android:padding="14dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_mode" android:textColor="#757575" android:textSize="12sp" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="@{mode}" android:textColor="#212121" android:textSize="16sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_mode" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="@{mode}" android:textColor="?attr/colorControlNormal" android:textSize="16sp" android:textStyle="bold" />
                     </LinearLayout>
 
                     <Space android:layout_width="12dp" android:layout_height="match_parent" />
@@ -202,8 +204,8 @@
                         android:onClick="@{() -> self.request(Request.OpenProxy)}"
                         android:orientation="vertical"
                         android:padding="14dp">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cloud_nav_lines" android:textColor="#757575" android:textSize="12sp" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{lineName}" android:textColor="#212121" android:textSize="16sp" android:textStyle="bold" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cloud_nav_lines" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{lineName}" android:textColor="?attr/colorControlNormal" android:textSize="16sp" android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -214,15 +216,15 @@
                     android:orientation="horizontal"
                     android:weightSum="2">
                     <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:clickable="true" android:focusable="true" android:defaultFocusHighlightEnabled="true" android:gravity="center_vertical" android:onClick="@{() -> self.request(Request.DetectNetwork)}" android:orientation="vertical" android:padding="14dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_detection" android:textColor="#757575" android:textSize="12sp" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{networkResult}" android:textColor="#212121" android:textSize="15sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_detection" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
+                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{networkResult}" android:textColor="?attr/colorControlNormal" android:textSize="15sp" android:textStyle="bold" />
                     </LinearLayout>
                     <Space android:layout_width="12dp" android:layout_height="match_parent" />
                     <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:gravity="center_vertical" android:orientation="vertical" android:padding="14dp">
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_speed" android:textColor="#757575" android:textSize="12sp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_speed" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
-                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↑ " + uploadSpeed}' android:textColor="#212121" android:textSize="13sp" android:textStyle="bold" />
-                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↓ " + downloadSpeed}' android:textColor="#212121" android:textSize="13sp" android:textStyle="bold" />
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↑ " + uploadSpeed}' android:textColor="?attr/colorControlNormal" android:textSize="13sp" android:textStyle="bold" />
+                            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↓ " + downloadSpeed}' android:textColor="?attr/colorControlNormal" android:textSize="13sp" android:textStyle="bold" />
                         </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>

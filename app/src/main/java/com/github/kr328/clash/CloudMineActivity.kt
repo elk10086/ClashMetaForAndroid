@@ -36,6 +36,7 @@ import com.github.kr328.clash.design.model.DarkMode
 import com.github.kr328.clash.design.store.UiStore
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withProfile
+import com.github.kr328.clash.util.ApplicationObserver
 import java.util.UUID
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -88,16 +89,16 @@ private fun Context.cloudPrimaryColor(): Int = Color.parseColor(
     },
 )
 
-private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).darkMode == DarkMode.ForceDark ||
-    UiStore(this).darkMode == DarkMode.Auto && resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-) Color.parseColor("#121212") else Color.WHITE
+private fun Context.cloudButtonTextColor(): Int = Color.parseColor("#121212")
 
 class CloudMineActivity : AppCompatActivity() {
     private lateinit var expiryView: TextView
+    private var appliedThemeSignature = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applyCloudTheme()
         super.onCreate(savedInstanceState)
+        appliedThemeSignature = themeSignature()
         title = getString(DesignR.string.cloud_nav_mine)
         val root = vertical().apply {
             setBackgroundColor(cloudColor("#FAFAFA"))
@@ -109,7 +110,7 @@ class CloudMineActivity : AppCompatActivity() {
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
                 addView(TextView(this@CloudMineActivity).apply {
                     text = maskEmail(CloudSession(this@CloudMineActivity).email)
-                    textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(Typeface.create("sans-serif-rounded", Typeface.BOLD))
+                    textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD)
                 }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
             })
             addView(vipBanner())
@@ -153,6 +154,13 @@ class CloudMineActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (appliedThemeSignature.isNotEmpty() && appliedThemeSignature != themeSignature()) recreate()
+    }
+
+    private fun themeSignature(): String = UiStore(this).let { "${it.darkMode}:${it.cloudThemeStyle}:${it.pureBlack}" }
+
     private fun open(type: String) = startActivity(
         Intent(this, CloudBusinessActivity::class.java).putExtra("type", type),
     )
@@ -161,10 +169,8 @@ class CloudMineActivity : AppCompatActivity() {
         text = getString(DesignR.string.cloud_logout)
         textSize = 15f
         gravity = Gravity.CENTER
-        setTextColor(Color.WHITE)
-        background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Color.parseColor("#3257FF"), Color.parseColor("#24D4F3"))).apply {
-            cornerRadius = dp(25).toFloat()
-        }
+        setTextColor(cloudButtonTextColor())
+        background = GradientDrawable().apply { setColor(cloudPrimaryColor()); cornerRadius = dp(25).toFloat() }
         setOnClickListener { confirmLogout() }
     }.also { it.layoutParams = LinearLayout.LayoutParams(dp(200), dp(50)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(12); bottomMargin = dp(20) } }
 
@@ -264,8 +270,8 @@ class CloudMineActivity : AppCompatActivity() {
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun toast(e: Throwable) = Toast.makeText(this, e.message ?: "操作失败", Toast.LENGTH_LONG).show()
     private fun roundRect(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
-        setColor(cloudColor(fill)); cornerRadius = dp(radius).toFloat()
-        if (stroke != null) setStroke(dp(1), cloudColor(stroke))
+        setColor(if (fill == "#212121") cloudPrimaryColor() else cloudColor(fill)); cornerRadius = dp(radius).toFloat()
+        if (stroke != null) setStroke(dp(1), if (stroke == "#212121") cloudPrimaryColor() else cloudColor(stroke))
     }
 }
 
@@ -374,12 +380,14 @@ class CloudBusinessActivity : AppCompatActivity() {
         val modes = listOf(DarkMode.Auto, DarkMode.ForceLight, DarkMode.ForceDark)
         content.addView(choices(listOf("跟随系统", "浅色", "深色").mapIndexed { index, label -> label to (store.darkMode == modes[index]) }) { index ->
             store.darkMode = modes[index]
+            refreshAllThemedActivities()
             recreate()
         })
 
         content.addView(sectionTitle("主题风格", "颜色和字体会随风格同步切换"))
         content.addView(choices(listOf("极简风", "公主风", "男神风", "二次元").mapIndexed { index, label -> label to (store.cloudThemeStyle == index) }) { index ->
             store.cloudThemeStyle = index
+            refreshAllThemedActivities()
             recreate()
         })
 
@@ -395,9 +403,15 @@ class CloudBusinessActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(Switch(this@CloudBusinessActivity).apply {
                 isChecked = store.pureBlack
-                setOnCheckedChangeListener { _, checked -> store.pureBlack = checked; recreate() }
+                setOnCheckedChangeListener { _, checked -> store.pureBlack = checked; refreshAllThemedActivities(); recreate() }
             })
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22) })
+    }
+
+    private fun refreshAllThemedActivities() {
+        ApplicationObserver.createdActivities.toList().forEach { activity ->
+            if (!activity.isFinishing && !activity.isDestroyed) activity.recreate()
+        }
     }
 
     private fun applyCloudTypeface(view: View) {
@@ -611,7 +625,7 @@ class CloudBusinessActivity : AppCompatActivity() {
     private fun planContentWebView(raw: String): View {
         val estimatedHeight = (parseRights(raw).size.coerceIn(2, 9) * 34 + 28)
         val htmlTextColor = String.format("#%06X", 0xFFFFFF and cloudColor("#424242"))
-        val htmlLinkColor = String.format("#%06X", 0xFFFFFF and cloudColor("#8DB4C9"))
+        val htmlLinkColor = String.format("#%06X", 0xFFFFFF and cloudPrimaryColor())
         val html = """
             <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
             <style>html,body{margin:0;padding:0;background:transparent;color:$htmlTextColor;font-family:'Arial Rounded MT Bold','Noto Sans CJK SC',sans-serif;font-size:14px;line-height:1.75}p{margin:4px 0}a{color:$htmlLinkColor}img{max-width:100%;height:auto;border-radius:8px}ul,ol{padding-left:22px;margin:6px 0}table{max-width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid currentColor}</style>
@@ -696,7 +710,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 addView(LinearLayout(this@CloudBusinessActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
                     addView(TextView(this@CloudBusinessActivity).apply { text = plan?.optString("name") ?: "订单"; textSize = 16f; setTextColor(cloudColor("#212121")); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
-                    addView(TextView(this@CloudBusinessActivity).apply { text = status; textSize = 14f; setTextColor(Color.parseColor(statusColor)); setPadding(dp(8), 0, 0, 0) })
+                    addView(TextView(this@CloudBusinessActivity).apply { text = status; textSize = 14f; setTextColor(cloudColor(statusColor)); setPadding(dp(8), 0, 0, 0) })
                 })
                 fun line(label: String, value: String) = TextView(this@CloudBusinessActivity).apply { text = "$label：$value"; textSize = 13f; setTextColor(cloudColor("#616161")); setPadding(0, dp(5), 0, 0) }
                 addView(line("订单号", tradeNo))
@@ -722,7 +736,7 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun actionButton(label: String, primary: Boolean, click: () -> Unit) = TextView(this).apply {
         text = label; gravity = Gravity.CENTER; textSize = 14f; isClickable = true; setOnClickListener { click() }
-        setTextColor(Color.parseColor(if (primary) "#FFFFFF" else "#424242"))
+        setTextColor(if (primary) cloudButtonTextColor() else cloudColor("#424242"))
         background = rounded(if (primary) "#212121" else "#FFFFFF", 19, if (primary) null else "#9E9E9E")
         layoutParams = LinearLayout.LayoutParams(dp(100), dp(38))
     }
@@ -842,7 +856,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                     addView(TextView(this@CloudBusinessActivity).apply { text = item.optString("subject", "工单 #${item.optString("id")}"); textSize = 15f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 2 })
                     addView(TextView(this@CloudBusinessActivity).apply { text = "${level}优先级 · ${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}"; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(7), 0, 0) })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(TextView(this@CloudBusinessActivity).apply { text = state; textSize = 12f; gravity = Gravity.CENTER; setTextColor(Color.parseColor(if (item.optInt("status") == 0) "#B45309" else "#757575")); background = rounded(if (item.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99); setPadding(dp(9), dp(4), dp(9), dp(4)) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = state; textSize = 12f; gravity = Gravity.CENTER; setTextColor(cloudColor(if (item.optInt("status") == 0) "#B45309" else "#757575")); background = rounded(if (item.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99); setPadding(dp(9), dp(4), dp(9), dp(4)) })
                 addView(TextView(this@CloudBusinessActivity).apply { text = "›"; textSize = 24f; setTextColor(cloudColor("#9E9E9E")); gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(30), dp(42)))
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
@@ -950,8 +964,8 @@ class CloudBusinessActivity : AppCompatActivity() {
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
     private fun roundedCard() = GradientDrawable().apply { setColor(cloudColor("#FFFFFF")); cornerRadius = dp(14).toFloat(); setStroke(dp(1), cloudColor("#E0E0E0")) }
     private fun rounded(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
-        setColor(cloudColor(fill)); cornerRadius = dp(radius).toFloat()
-        stroke?.let { setStroke(dp(1), cloudColor(it)) }
+        setColor(if (fill == "#212121") cloudPrimaryColor() else cloudColor(fill)); cornerRadius = dp(radius).toFloat()
+        stroke?.let { setStroke(dp(1), if (it == "#212121") cloudPrimaryColor() else cloudColor(it)) }
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun toast(e: Throwable) = Toast.makeText(this, e.message ?: "操作失败", Toast.LENGTH_LONG).show()
