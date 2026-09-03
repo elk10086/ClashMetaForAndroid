@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.text.Html
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ImageView
@@ -377,16 +378,12 @@ class CloudBusinessActivity : AppCompatActivity() {
             text = "低至 ￥${money(lowest)}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(8))
         })
         val rights = parseRights(plan.optString("content"))
-        addView(GridLayout(this@CloudBusinessActivity).apply {
-            columnCount = 2
-            periods.forEachIndexed { index, period ->
+        addView(CloudFlowLayout(this@CloudBusinessActivity, dp(8), dp(8)).apply {
+            periods.forEach { period ->
                 addView(TextView(this@CloudBusinessActivity).apply {
                     text = "${period.second} ￥${money(plan.optLong(period.first))}"; textSize = 12f; setTextColor(Color.parseColor("#212121")); gravity = Gravity.CENTER
                     setPadding(dp(10), dp(5), dp(10), dp(5)); background = rounded("#EEEEEE", 99)
-                }, GridLayout.LayoutParams().apply {
-                    width = 0; height = dp(34); columnSpec = GridLayout.spec(index % 2, 1f); rowSpec = GridLayout.spec(index / 2)
-                    setMargins(0, 0, if (index % 2 == 0) dp(8) else 0, dp(8))
-                })
+                }, ViewGroup.LayoutParams(-2, dp(32)))
             }
         })
         rights.take(3).forEach { right ->
