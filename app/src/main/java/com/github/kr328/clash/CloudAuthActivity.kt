@@ -2,8 +2,6 @@ package com.github.kr328.clash
 
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.LinearGradient
-import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.net.Uri
@@ -95,11 +93,7 @@ class CloudAuthActivity : AppCompatActivity() {
             layoutParams = lp(minOf(resources.displayMetrics.widthPixels - dp(56), dp(440)), -2)
             addView(TextView(this@CloudAuthActivity).apply {
                 text = getString(DesignR.string.cloud_brand); gravity = Gravity.CENTER; textSize = 32f
-                typeface = Typeface.create("sans-serif-black", Typeface.BOLD); setTextColor(Color.WHITE); letterSpacing = .08f
-                post {
-                    paint.shader = LinearGradient(0f, 0f, width.toFloat(), 0f, intArrayOf(Color.rgb(45, 121, 251), Color.rgb(50, 87, 255), Color.rgb(36, 212, 243)), null, Shader.TileMode.CLAMP)
-                    invalidate()
-                }
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD); setTextColor(foreground()); letterSpacing = .08f
                 setOnClickListener {
                     val now = android.os.SystemClock.elapsedRealtime()
                     if (now - lastBrandTapAt <= 500L) {
@@ -199,7 +193,7 @@ class CloudAuthActivity : AppCompatActivity() {
 
     private fun page(content: View, footer: Boolean = false) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(blend(backgroundColor(), accent(), .05f), backgroundColor(), backgroundColor()))
+        setBackgroundColor(backgroundColor())
         addView(FrameLayout(this@CloudAuthActivity).apply {
             addView(ScrollView(this@CloudAuthActivity).apply { isFillViewport = true; addView(content) }, FrameLayout.LayoutParams(-1, -1))
             if (footer) addView(serviceButton(), FrameLayout.LayoutParams(dp(56), dp(56), Gravity.END or Gravity.BOTTOM).apply {
@@ -221,8 +215,8 @@ class CloudAuthActivity : AppCompatActivity() {
     }
 
     private fun primaryButton(label: String, login: Boolean = false, action: () -> Unit) = TextView(this).apply {
-        text = label; textSize = if (login) 17f else 15f; if (login) setTypeface(typeface, Typeface.BOLD); setTextColor(Color.WHITE); gravity = Gravity.CENTER; letterSpacing = if (login) .07f else 0f
-        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(accent(), blend(accent(), tertiary(), .45f))).apply { cornerRadius = dp(if (login) 28 else 25).toFloat() }
+        text = label; textSize = if (login) 17f else 15f; if (login) setTypeface(typeface, Typeface.BOLD); setTextColor(onAccent()); gravity = Gravity.CENTER; letterSpacing = if (login) .07f else 0f
+        background = rounded(accent(), if (login) 28 else 25)
         if (login) elevation = dp(12).toFloat()
         setOnClickListener { if (!busy) action() }; layoutParams = lp(-1, dp(if (login) 56 else 50))
     }
@@ -236,6 +230,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun updateClearIcon(field: EditText) = field.setCompoundDrawablesWithIntrinsicBounds(0, 0, if (field.text.isNullOrEmpty()) 0 else R.drawable.cloud_clear, 0)
     private fun serviceButton() = ImageView(this).apply {
         setImageResource(R.drawable.cloud_headset)
+        setColorFilter(onAccent())
         setPadding(dp(14), dp(14), dp(14), dp(14))
         background = rounded(accent(), 28)
         elevation = dp(5).toFloat()
@@ -264,13 +259,13 @@ class CloudAuthActivity : AppCompatActivity() {
     }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    private fun backgroundColor() = if (isDark()) Color.rgb(23, 23, 35) else Color.rgb(250, 250, 252)
-    private fun surface() = if (isDark()) Color.rgb(36, 39, 56) else Color.WHITE
-    private fun foreground() = if (isDark()) Color.WHITE else Color.rgb(32, 35, 45)
-    private fun secondary() = if (isDark()) Color.rgb(164, 173, 189) else Color.rgb(93, 93, 109)
-    private fun outline() = if (isDark()) Color.rgb(73, 77, 103) else Color.rgb(224, 226, 232)
-    private fun accent() = Color.rgb(50, 87, 255)
-    private fun tertiary() = Color.rgb(36, 212, 243)
+    private fun backgroundColor() = if (isDark()) Color.rgb(10, 10, 10) else Color.WHITE
+    private fun surface() = if (isDark()) Color.rgb(28, 28, 28) else Color.rgb(248, 248, 248)
+    private fun foreground() = if (isDark()) Color.WHITE else Color.rgb(16, 16, 16)
+    private fun secondary() = if (isDark()) Color.rgb(174, 174, 174) else Color.rgb(98, 98, 98)
+    private fun outline() = if (isDark()) Color.rgb(66, 66, 66) else Color.rgb(224, 224, 224)
+    private fun accent() = if (isDark()) Color.WHITE else Color.BLACK
+    private fun onAccent() = if (isDark()) Color.BLACK else Color.WHITE
     private fun isDark() = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }
