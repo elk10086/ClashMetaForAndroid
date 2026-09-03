@@ -21,6 +21,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.content.res.ResourcesCompat
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudTestAccount
@@ -311,12 +312,15 @@ class CloudAuthActivity : AppCompatActivity() {
         }
         if (isDark() && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
     }
-    private fun themeTypeface(style: Int): Typeface = Typeface.create(when (UiStore(this).cloudThemeStyle) {
-        1 -> "sans-serif-condensed"
-        2 -> "sans-serif-light"
-        3 -> "sans-serif"
-        0 -> "sans-serif-rounded"
-        else -> "sans-serif"
-    }, style)
+    private fun themeTypeface(style: Int): Typeface {
+        val font = when (UiStore(this).cloudThemeStyle) {
+            0 -> DesignR.font.skin_minimal
+            1 -> DesignR.font.skin_sakura
+            2 -> DesignR.font.skin_god
+            3 -> DesignR.font.skin_anime
+            else -> return Typeface.create("sans-serif", style)
+        }
+        return Typeface.create(ResourcesCompat.getFont(this, font), style)
+    }
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }

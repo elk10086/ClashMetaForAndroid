@@ -27,6 +27,7 @@ import android.webkit.WebViewClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.core.content.res.ResourcesCompat
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudSubscription
@@ -115,12 +116,13 @@ private fun Context.applyCloudTypography(view: View) {
     if (skin < 0) return
     if (view is TextView) {
         val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-        view.typeface = Typeface.create(when (skin) {
-            0 -> "sans-serif-rounded"
-            1 -> "sans-serif-condensed"
-            2 -> "sans-serif-light"
-            else -> "sans-serif"
-        }, style)
+        val family = ResourcesCompat.getFont(this, when (skin) {
+            0 -> DesignR.font.skin_minimal
+            1 -> DesignR.font.skin_sakura
+            2 -> DesignR.font.skin_god
+            else -> DesignR.font.skin_anime
+        })
+        view.typeface = Typeface.create(family, style)
         view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
         view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
     }
@@ -653,9 +655,18 @@ class CloudBusinessActivity : AppCompatActivity() {
         val estimatedHeight = (parseRights(raw).size.coerceIn(2, 9) * 34 + 28)
         val htmlTextColor = String.format("#%06X", 0xFFFFFF and cloudColor("#424242"))
         val htmlLinkColor = String.format("#%06X", 0xFFFFFF and cloudPrimaryColor())
+        val webFont = when (UiStore(this).cloudThemeStyle) {
+            0 -> "zen_maru_gothic_regular.ttf"
+            1 -> "barlow_condensed_regular.ttf"
+            2 -> "raleway_variable.ttf"
+            3 -> "zcool_kuaile_regular.ttf"
+            else -> null
+        }
+        val fontFace = webFont?.let { "@font-face{font-family:SkinFont;src:url('$it')}" }.orEmpty()
+        val fontFamily = if (webFont == null) "sans-serif" else "SkinFont,sans-serif"
         val html = """
             <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-            <style>html,body{margin:0;padding:0;background:transparent;color:$htmlTextColor;font-family:'Arial Rounded MT Bold','Noto Sans CJK SC',sans-serif;font-size:14px;line-height:1.75}p{margin:4px 0}a{color:$htmlLinkColor}img{max-width:100%;height:auto;border-radius:8px}ul,ol{padding-left:22px;margin:6px 0}table{max-width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid currentColor}</style>
+            <style>$fontFace html,body{margin:0;padding:0;background:transparent;color:$htmlTextColor;font-family:$fontFamily;font-size:14px;line-height:1.75}p{margin:4px 0}a{color:$htmlLinkColor}img{max-width:100%;height:auto;border-radius:8px}ul,ol{padding-left:22px;margin:6px 0}table{max-width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid currentColor}</style>
             </head><body>$raw</body></html>
         """.trimIndent()
         return WebView(this).apply {
@@ -673,7 +684,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                     }
                 }
             }
-            loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            loadDataWithBaseURL("file:///android_res/font/", html, "text/html", "UTF-8", null)
             layoutParams = LinearLayout.LayoutParams(-1, dp(estimatedHeight))
         }
     }

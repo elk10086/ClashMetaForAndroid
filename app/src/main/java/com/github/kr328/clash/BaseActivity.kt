@@ -11,6 +11,7 @@ import android.graphics.Typeface
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
+import androidx.core.content.res.ResourcesCompat
 import com.github.kr328.clash.common.compat.isAllowForceDarkCompat
 import com.github.kr328.clash.common.compat.isLightNavigationBarCompat
 import com.github.kr328.clash.common.compat.isLightStatusBarsCompat
@@ -60,12 +61,12 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
         if (skin < 0) return
         if (view is TextView) {
             val weight = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-            val family = when (skin) {
-                0 -> "sans-serif-rounded"
-                1 -> "sans-serif-condensed"
-                2 -> "sans-serif-light"
-                else -> "sans-serif"
-            }
+            val family = ResourcesCompat.getFont(this, when (skin) {
+                0 -> R.font.skin_minimal
+                1 -> R.font.skin_sakura
+                2 -> R.font.skin_god
+                else -> R.font.skin_anime
+            })
             view.typeface = Typeface.create(family, weight)
             view.textScaleX = when (skin) {
                 1 -> .90f

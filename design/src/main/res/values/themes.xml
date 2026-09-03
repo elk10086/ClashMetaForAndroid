@@ -171,32 +171,32 @@
         <item name="colorPrimary">@color/theme_minimal</item>
         <item name="colorSecondary">@color/theme_minimal</item>
         <item name="colorOnPrimary">#FF121212</item>
-        <item name="android:fontFamily">sans-serif-rounded</item>
-        <item name="fontFamily">sans-serif-rounded</item>
+        <item name="android:fontFamily">@font/skin_minimal</item>
+        <item name="fontFamily">@font/skin_minimal</item>
     </style>
 
     <style name="CloudThemeSakura">
         <item name="colorPrimary">@color/theme_sakura</item>
         <item name="colorSecondary">@color/theme_sakura</item>
         <item name="colorOnPrimary">#FF121212</item>
-        <item name="android:fontFamily">sans-serif-condensed</item>
-        <item name="fontFamily">sans-serif-condensed</item>
+        <item name="android:fontFamily">@font/skin_sakura</item>
+        <item name="fontFamily">@font/skin_sakura</item>
     </style>
 
     <style name="CloudThemeGod">
         <item name="colorPrimary">@color/theme_god</item>
         <item name="colorSecondary">@color/theme_god</item>
         <item name="colorOnPrimary">#FF121212</item>
-        <item name="android:fontFamily">sans-serif-light</item>
-        <item name="fontFamily">sans-serif-light</item>
+        <item name="android:fontFamily">@font/skin_god</item>
+        <item name="fontFamily">@font/skin_god</item>
     </style>
 
     <style name="CloudThemeAnime">
         <item name="colorPrimary">@color/theme_anime</item>
         <item name="colorSecondary">@color/theme_anime</item>
         <item name="colorOnPrimary">#FF121212</item>
-        <item name="android:fontFamily">sans-serif</item>
-        <item name="fontFamily">sans-serif</item>
+        <item name="android:fontFamily">@font/skin_anime</item>
+        <item name="fontFamily">@font/skin_anime</item>
     </style>
 
     <style name="CloudThemePureBlack">
