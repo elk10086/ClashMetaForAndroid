@@ -20,6 +20,8 @@ import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -352,26 +354,14 @@ class CloudBusinessActivity : AppCompatActivity() {
         addView(TextView(this@CloudBusinessActivity).apply {
             text = "低至 ￥${money(lowest)}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(8))
         })
-        addView(GridLayout(this@CloudBusinessActivity).apply {
-            columnCount = 2
-            periods.forEachIndexed { index, period ->
-                addView(TextView(this@CloudBusinessActivity).apply {
-                    text = "${period.second} ￥${money(plan.optLong(period.first))}"; textSize = 12f; setTextColor(Color.parseColor("#212121")); gravity = Gravity.CENTER
-                    setPadding(dp(9), dp(5), dp(9), dp(5)); background = rounded("#EEEEEE", 99)
-                }, GridLayout.LayoutParams().apply {
-                    width = 0; height = dp(34); columnSpec = GridLayout.spec(index % 2, 1f); rowSpec = GridLayout.spec(index / 2)
-                    setMargins(0, 0, if (index % 2 == 0) dp(8) else 0, dp(8))
-                })
-            }
-        })
         val rights = parseRights(plan.optString("content"))
-        rights.take(3).forEach { right ->
+        rights.take(2).forEach { right ->
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "✓  $right"; textSize = 13f; setTextColor(Color.parseColor("#424242")); maxLines = 1; setPadding(0, dp(7), 0, 0)
             })
         }
-        if (rights.size > 3) addView(TextView(this@CloudBusinessActivity).apply {
-            text = "还有 ${rights.size - 3} 项权益"; textSize = 12f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(7), 0, 0)
+        addView(TextView(this@CloudBusinessActivity).apply {
+            text = "${periods.size} 种购买周期 · 完整权益请查看详情"; textSize = 12f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(9), 0, 0)
         })
         addView(TextView(this@CloudBusinessActivity).apply {
             text = "查看套餐详情  ›"; textSize = 13f; setTextColor(Color.BLACK); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(12), 0, 0)
@@ -409,7 +399,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)); background = roundedCard()
             addView(TextView(this@CloudBusinessActivity).apply { text = plan.optString("name", "套餐"); textSize = 18f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD) })
             addView(TextView(this@CloudBusinessActivity).apply { text = "低至 ¥${money(periods.minOf { plan.optLong(it.first) })}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setPadding(0, dp(7), 0, dp(10)) })
-            parseRights(plan.optString("content")).forEach { right -> addView(TextView(this@CloudBusinessActivity).apply { text = right; textSize = 14f; setTextColor(Color.parseColor("#424242")); setPadding(0, dp(4), 0, dp(4)) }) }
+            addView(planContentWebView(plan.optString("content")))
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
         content.addView(TextView(this).apply { text = "选择周期"; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(8), 0, dp(10)) })
@@ -453,6 +443,33 @@ class CloudBusinessActivity : AppCompatActivity() {
                 setOnClickListener { lifecycleScope.launch { createAndPay(plan.optString("id"), selected.first, coupon.text.toString().trim()) } }
             }, LinearLayout.LayoutParams(dp(108), dp(42)))
         }, LinearLayout.LayoutParams(-1, dp(72)))
+    }
+
+    private fun planContentWebView(raw: String): View {
+        val estimatedHeight = (parseRights(raw).size.coerceIn(2, 9) * 34 + 28)
+        val html = """
+            <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+            <style>html,body{margin:0;padding:0;background:transparent;color:#424242;font-family:sans-serif;font-size:14px;line-height:1.75}p{margin:4px 0}img{max-width:100%;height:auto}ul,ol{padding-left:22px;margin:6px 0}</style>
+            </head><body>$raw</body></html>
+        """.trimIndent()
+        return WebView(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
+            settings.javaScriptEnabled = true
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
+            webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, url: String?) {
+                    view.evaluateJavascript("document.documentElement.scrollHeight.toString()") { value ->
+                        val cssHeight = value.trim('"').toFloatOrNull() ?: return@evaluateJavascript
+                        view.layoutParams = view.layoutParams.apply {
+                            height = dp(cssHeight.toInt().coerceIn(120, 1200))
+                        }
+                    }
+                }
+            }
+            loadDataWithBaseURL(null, html, "text/html", "UTF-8", null)
+            layoutParams = LinearLayout.LayoutParams(-1, dp(estimatedHeight))
+        }
     }
 
     @Suppress("DEPRECATION")
