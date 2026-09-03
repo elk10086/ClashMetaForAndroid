@@ -15,6 +15,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ImageView
+import android.widget.GridLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
@@ -212,6 +213,7 @@ class CloudMineActivity : AppCompatActivity() {
 class CloudBusinessActivity : AppCompatActivity() {
     private lateinit var content: LinearLayout
     private lateinit var loading: ProgressBar
+    private lateinit var pageRoot: LinearLayout
     private val api by lazy { CloudApi(this) }
     private val type by lazy { intent.getStringExtra("type") ?: "plans" }
 
@@ -222,12 +224,13 @@ class CloudBusinessActivity : AppCompatActivity() {
         content.setBackgroundColor(Color.parseColor("#FAFAFA"))
         loading = ProgressBar(this)
         content.addView(loading, LinearLayout.LayoutParams(-1, dp(48)))
-        setContentView(LinearLayout(this).apply {
+        pageRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#FAFAFA"))
             addView(pageHeader(pageTitle), LinearLayout.LayoutParams(-1, dp(56)))
             addView(ScrollView(this@CloudBusinessActivity).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
-        })
+        }
+        setContentView(pageRoot)
         reload()
     }
 
@@ -340,13 +343,16 @@ class CloudBusinessActivity : AppCompatActivity() {
         addView(TextView(this@CloudBusinessActivity).apply {
             text = "低至 ￥${money(lowest)}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(8))
         })
-        addView(LinearLayout(this@CloudBusinessActivity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            periods.take(3).forEach { period ->
+        addView(GridLayout(this@CloudBusinessActivity).apply {
+            columnCount = 2
+            periods.forEachIndexed { index, period ->
                 addView(TextView(this@CloudBusinessActivity).apply {
                     text = "${period.second} ￥${money(plan.optLong(period.first))}"; textSize = 12f; setTextColor(Color.parseColor("#212121")); gravity = Gravity.CENTER
                     setPadding(dp(9), dp(5), dp(9), dp(5)); background = rounded("#EEEEEE", 99)
-                }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) })
+                }, GridLayout.LayoutParams().apply {
+                    width = 0; height = dp(34); columnSpec = GridLayout.spec(index % 2, 1f); rowSpec = GridLayout.spec(index / 2)
+                    setMargins(0, 0, if (index % 2 == 0) dp(8) else 0, dp(8))
+                })
             }
         })
         val rights = parseRights(plan.optString("content"))
@@ -395,16 +401,19 @@ class CloudBusinessActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
         content.addView(TextView(this).apply { text = "选择周期"; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(8), 0, dp(10)) })
-        val chips = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val chips = GridLayout(this).apply { columnCount = 3 }
         fun redrawChips() {
             chips.removeAllViews()
-            periods.forEach { period ->
+            periods.forEachIndexed { index, period ->
                 chips.addView(TextView(this).apply {
-                    text = "${period.second}    ¥${money(plan.optLong(period.first))}"; textSize = 14f; gravity = Gravity.CENTER_VERTICAL
-                    setTextColor(Color.parseColor("#212121")); setPadding(dp(14), 0, dp(14), 0)
+                    text = "${period.second}\n¥${money(plan.optLong(period.first))}"; textSize = 13f; gravity = Gravity.CENTER
+                    setTextColor(Color.parseColor("#212121")); setPadding(dp(6), dp(5), dp(6), dp(5))
                     background = rounded(if (period == selected) "#E8E8E8" else "#FFFFFF", 12, if (period == selected) "#212121" else "#E0E0E0")
                     isClickable = true; setOnClickListener { selected = period; discount = 0; redrawChips(); updateAmount() }
-                }, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+                }, GridLayout.LayoutParams().apply {
+                    width = 0; height = dp(58); columnSpec = GridLayout.spec(index % 3, 1f); rowSpec = GridLayout.spec(index / 3)
+                    setMargins(0, 0, if (index % 3 < 2) dp(8) else 0, dp(8))
+                })
             }
         }
         redrawChips(); content.addView(chips)
@@ -424,14 +433,14 @@ class CloudBusinessActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(dp(76), dp(48)).apply { marginStart = dp(10) })
         })
         updateAmount()
-        content.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)); background = roundedCard()
+        pageRoot.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(12), dp(18), dp(12)); setBackgroundColor(Color.WHITE); elevation = dp(8).toFloat()
             addView(amount, LinearLayout.LayoutParams(0, dp(48), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "立即购买"; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 18); isClickable = true
                 setOnClickListener { lifecycleScope.launch { createAndPay(plan.optString("id"), selected.first, coupon.text.toString().trim()) } }
             }, LinearLayout.LayoutParams(dp(108), dp(42)))
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+        }, LinearLayout.LayoutParams(-1, dp(72)))
     }
 
     @Suppress("DEPRECATION")
@@ -595,19 +604,35 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     private fun renderTickets(json: JSONObject) {
-        content.addView(TextView(this).apply {
-            text = "+ 创建工单"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 18); isClickable = true
-            setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_create")) }
-        }, LinearLayout.LayoutParams(dp(130), dp(42)).apply { gravity = Gravity.END; bottomMargin = dp(14) })
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@CloudBusinessActivity).apply { text = "问题与反馈"; textSize = 17f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "+ 创建工单"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 18); isClickable = true
+                setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_create")) }
+            }, LinearLayout.LayoutParams(dp(122), dp(40)))
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
         val list = json.optJSONArray("data") ?: JSONArray()
-        if (list.length() == 0) return addText("暂无工单")
+        if (list.length() == 0) {
+            addText("◌", 38f, "#9E9E9E")
+            addText("暂无工单\n遇到问题时，可以创建工单联系我们", 14f, "#757575")
+            return
+        }
         repeat(list.length()) { i ->
             val item = list.optJSONObject(i) ?: return@repeat
             val level = when (item.optInt("level")) { 0 -> "低"; 2 -> "高"; else -> "中" }
             val state = if (item.optInt("status") == 0) "处理中" else "已关闭"
-            addCard(item.optString("subject", "工单 #${item.optString("id")}"), "$level · $state\n${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}") {
-                startActivity(Intent(this, CloudBusinessActivity::class.java).putExtra("type", "ticket_detail").putExtra("ticket_id", item.optString("id")))
-            }
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(15), dp(13), dp(10), dp(13)); background = roundedCard(); isClickable = true
+                setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_detail").putExtra("ticket_id", item.optString("id"))) }
+                addView(LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(this@CloudBusinessActivity).apply { text = item.optString("subject", "工单 #${item.optString("id")}"); textSize = 15f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 2 })
+                    addView(TextView(this@CloudBusinessActivity).apply { text = "${level}优先级 · ${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}"; textSize = 12f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(7), 0, 0) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(TextView(this@CloudBusinessActivity).apply { text = state; textSize = 12f; gravity = Gravity.CENTER; setTextColor(Color.parseColor(if (item.optInt("status") == 0) "#B45309" else "#757575")); background = rounded(if (item.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99); setPadding(dp(9), dp(4), dp(9), dp(4)) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = "›"; textSize = 24f; setTextColor(Color.parseColor("#9E9E9E")); gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(30), dp(42)))
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
     }
 
@@ -632,14 +657,14 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
         if (!closed) {
             val reply = EditText(this).apply { hint = "请输入回复内容"; minLines = 1; maxLines = 4; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(8), dp(12), dp(8)) }
-            content.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM; setPadding(0, dp(8), 0, dp(8))
+            pageRoot.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12), dp(8), dp(12), dp(8)); setBackgroundColor(Color.WHITE); elevation = dp(8).toFloat()
                 addView(reply, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(TextView(this@CloudBusinessActivity).apply {
                     text = "发送"; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 20); isClickable = true
                     setOnClickListener { val value = reply.text.toString().trim(); if (value.isNotEmpty()) lifecycleScope.launch { runCatching { api.replyTicket(ticket.optString("id"), value) }.onSuccess { recreate() }.onFailure { toast(it) } } }
                 }, LinearLayout.LayoutParams(dp(72), dp(42)).apply { marginStart = dp(8) })
-            })
+            }, LinearLayout.LayoutParams(-1, -2))
         }
     }
 
