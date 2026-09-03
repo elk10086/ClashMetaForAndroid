@@ -51,6 +51,7 @@ import com.github.kr328.clash.design.R as DesignR
 
 class MainActivity : BaseActivity<MainDesign>() {
     private val connectionClock by lazy { getSharedPreferences("cloud_connection_clock", MODE_PRIVATE) }
+    private val membershipCache by lazy { getSharedPreferences("cloud_membership_cache", MODE_PRIVATE) }
     private val subscriptionMutex = Mutex()
     private val networkDetectionMutex = Mutex()
     private var cloudSubscription: CloudSubscription? = null
@@ -70,6 +71,7 @@ class MainActivity : BaseActivity<MainDesign>() {
             CloudBottomNavigation.attach(this@MainActivity, CloudBottomNavigation.Tab.DASHBOARD)
         }
 
+        cloudSubscription = loadCachedCloudSubscription()
         design.fetch()
         launch { detectNetwork(design) }
         launch { runCatching { CloudReleaseManager.checkOnLaunch(this@MainActivity) } }
@@ -217,17 +219,22 @@ class MainActivity : BaseActivity<MainDesign>() {
                 0,
             )
             else -> {
-                val expiry = if (subscription.expiresAt > 0) {
-                    java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+                val expired = subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()
+                val transferFull = subscription.total > 0 && subscription.used >= subscription.total
+                val abnormal = subscription.planId == null || expired || transferFull
+                val expiry = when {
+                    subscription.expiresAt <= 0 -> "不限时长"
+                    expired -> "已过期"
+                    else -> java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
                         .format(java.util.Date(subscription.expiresAt * 1000))
-                } else "长期有效"
+                }
                 val progress = if (subscription.total > 0) {
                     (subscription.used * 100L / subscription.total).coerceIn(0, 100).toInt()
                 } else 0
                 setCloudAccount(
-                    subscription.plan.ifBlank { "未开通套餐" },
+                    subscription.plan.ifBlank { if (abnormal) "未开通套餐" else "套餐" },
                     "到期时间：$expiry",
-                    "已用 ${formatBytes(subscription.used)} / ${formatBytes(subscription.total)}",
+                    "${formatBytes(subscription.used)} / ${formatBytes(subscription.total)}",
                     progress,
                 )
             }
@@ -238,16 +245,61 @@ class MainActivity : BaseActivity<MainDesign>() {
         if (!CloudSession(this).loggedIn) return
         try {
             subscriptionMutex.withLock {
-                val subscription = CloudApi(this).subscription()
-                cloudSubscription = subscription
+                var failure: Throwable? = null
+                var subscription: CloudSubscription? = null
+                repeat(3) { attempt ->
+                    if (subscription == null) {
+                        runCatching { CloudApi(this).subscription() }
+                            .onSuccess { subscription = it }
+                            .onFailure { failure = it }
+                        if (subscription == null && attempt < 2) delay(2_000)
+                    }
+                }
+                val loaded = subscription ?: throw failure ?: IllegalStateException("会员信息加载失败")
+                cloudSubscription = loaded
                 cloudSyncError = null
-                importCloudProfile(subscription.subscribeUrl)
+                saveCachedCloudSubscription(loaded)
+                design.fetchCloudAccount()
+                // Membership display and profile import are independent in hle_fi. A profile
+                // refresh failure must not hide membership data that was fetched successfully.
+                runCatching { importCloudProfile(loaded.subscribeUrl) }
                 design.fetch()
             }
         } catch (e: Throwable) {
-            cloudSyncError = e.message ?: "未知错误"
+            if (cloudSubscription == null) cloudSyncError = e.message ?: "未知错误"
             design.fetchCloudAccount()
         }
+    }
+
+    private fun loadCachedCloudSubscription(): CloudSubscription? {
+        val sessionEmail = CloudSession(this).email.trim().lowercase()
+        if (sessionEmail.isBlank()) return null
+        return runCatching {
+            val json = JSONObject(membershipCache.getString("membership", "").orEmpty())
+            if (json.optString("account_email") != sessionEmail) return null
+            CloudSubscription(
+                email = json.optString("email", sessionEmail),
+                planId = if (json.isNull("plan_id")) null else json.optLong("plan_id"),
+                plan = json.optString("plan"),
+                subscribeUrl = json.optString("subscribe_url"),
+                used = json.optLong("used"),
+                total = json.optLong("total"),
+                expiresAt = json.optLong("expires_at"),
+            )
+        }.getOrNull()
+    }
+
+    private fun saveCachedCloudSubscription(subscription: CloudSubscription) {
+        val json = JSONObject()
+            .put("account_email", CloudSession(this).email.trim().lowercase())
+            .put("email", subscription.email)
+            .put("plan_id", subscription.planId ?: JSONObject.NULL)
+            .put("plan", subscription.plan)
+            .put("subscribe_url", subscription.subscribeUrl)
+            .put("used", subscription.used)
+            .put("total", subscription.total)
+            .put("expires_at", subscription.expiresAt)
+        membershipCache.edit().putString("membership", json.toString()).apply()
     }
 
     private suspend fun importCloudProfile(url: String) = withProfile {
@@ -299,9 +351,14 @@ class MainActivity : BaseActivity<MainDesign>() {
     }
 
     private fun formatBytes(value: Long): String {
-        val gib = value / 1024.0 / 1024.0 / 1024.0
-        return if (gib >= 1) String.format(java.util.Locale.US, "%.1f GB", gib)
-        else String.format(java.util.Locale.US, "%.1f MB", value / 1024.0 / 1024.0)
+        val units = arrayOf("B", "KB", "MB", "GB", "TB")
+        var amount = value.toDouble()
+        var index = 0
+        while (amount >= 1024 && index < units.lastIndex) {
+            amount /= 1024
+            index++
+        }
+        return String.format(java.util.Locale.US, if (index < 2) "%.0f%s" else "%.2f%s", amount, units[index])
     }
 
     private suspend fun MainDesign.fetchTraffic() {

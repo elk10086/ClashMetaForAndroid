@@ -157,6 +157,7 @@ class CloudMineActivity : AppCompatActivity() {
             session.clear()
             getSharedPreferences("cloud_config", MODE_PRIVATE).edit().clear().apply()
             getSharedPreferences("cloud_connection_clock", MODE_PRIVATE).edit().clear().apply()
+            getSharedPreferences("cloud_membership_cache", MODE_PRIVATE).edit().clear().apply()
             progress.dismiss()
             val login = Intent(this@CloudMineActivity, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -266,7 +267,7 @@ class CloudBusinessActivity : AppCompatActivity() {
         loading.visibility = View.VISIBLE
         try {
             when (type) {
-                "plans" -> renderPlans(api.plans(), runCatching { api.subscription() }.getOrNull())
+                "plans" -> renderPlans(loadPlansWithCache(), runCatching { api.subscription() }.getOrNull())
                 "plan_detail" -> renderPlanDetails(api.planDetails(intent.getStringExtra("plan_id").orEmpty()))
                 "orders" -> renderOrders(api.orders())
                 "invite" -> renderInvite(api.inviteSummary(), api.inviteDetails(), api.userInfo())
@@ -277,6 +278,17 @@ class CloudBusinessActivity : AppCompatActivity() {
         } catch (e: Throwable) {
             addText(e.message ?: "加载失败", 14f, "#B00020")
         } finally { loading.visibility = View.GONE }
+    }
+
+    private suspend fun loadPlansWithCache(): JSONObject {
+        val prefs = getSharedPreferences("cloud_business_cache", MODE_PRIVATE)
+        return runCatching { api.plans() }
+            .onSuccess { prefs.edit().putString("plans", it.toString()).apply() }
+            .getOrElse { error ->
+                val cached = prefs.getString("plans", "").orEmpty()
+                if (cached.isBlank()) throw error
+                JSONObject(cached)
+            }
     }
 
     private fun renderPlans(json: JSONObject, subscription: CloudSubscription?) {

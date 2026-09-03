@@ -17,6 +17,7 @@ import javax.crypto.spec.SecretKeySpec
 
 data class CloudSubscription(
     val email: String,
+    val planId: Long?,
     val plan: String,
     val subscribeUrl: String,
     val used: Long,
@@ -64,6 +65,7 @@ class CloudApi(private val context: Context) {
         val plan = data.optJSONObject("plan")?.optString("name").orEmpty()
         CloudSubscription(
             email = data.optString("email", session.email),
+            planId = if (data.isNull("plan_id")) null else data.optLong("plan_id"),
             plan = plan,
             subscribeUrl = data.optString("subscribe_url"),
             used = data.optLong("u") + data.optLong("d"),

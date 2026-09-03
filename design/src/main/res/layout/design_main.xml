@@ -94,7 +94,11 @@
                     android:layout_height="wrap_content"
                     android:minHeight="112dp"
                     android:background="@drawable/cloud_membership_card"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:defaultFocusHighlightEnabled="true"
                     android:gravity="center_vertical"
+                    android:onClick="@{() -> self.request(Request.OpenPlans)}"
                     android:orientation="vertical"
                     android:padding="12dp">
 
