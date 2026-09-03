@@ -490,34 +490,44 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun renderOrders(json: JSONObject) {
         val list = json.optJSONArray("data") ?: JSONArray()
-        if (list.length() == 0) return addText("暂无订单")
+        if (list.length() == 0) {
+            addText("▧", 38f, "#9E9E9E")
+            addText("暂无订单", 16f, "#424242")
+            return
+        }
         repeat(list.length()) { i ->
             val order = list.optJSONObject(i) ?: return@repeat
             val plan = order.optJSONObject("plan")
-            val status = when (order.optInt("status")) { 0 -> "待支付"; 1 -> "已支付"; 2 -> "已取消"; else -> "已完成" }
+            val status = when (order.optInt("status")) { 0 -> "待支付"; 2 -> "已取消"; else -> "已完成" }
+            val statusColor = when (order.optInt("status")) { 0 -> "#212121"; 2 -> "#9E9E9E"; else -> "#FF9800" }
             val tradeNo = order.optString("trade_no")
             content.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(12)); background = roundedCard()
-                isClickable = true; setOnClickListener { showOrderDetails(tradeNo) }
+                orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(12), dp(10), dp(10)); background = roundedCard()
                 addView(LinearLayout(this@CloudBusinessActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                    addView(TextView(this@CloudBusinessActivity).apply { text = plan?.optString("name") ?: "订单"; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
-                    addView(TextView(this@CloudBusinessActivity).apply { text = status; textSize = 12f; gravity = Gravity.CENTER; setPadding(dp(10), dp(4), dp(10), dp(4)); setTextColor(Color.parseColor(if (order.optInt("status") == 0) "#B45309" else "#616161")); background = rounded(if (order.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99) })
+                    addView(TextView(this@CloudBusinessActivity).apply { text = plan?.optString("name") ?: "订单"; textSize = 16f; setTextColor(Color.parseColor("#212121")); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(TextView(this@CloudBusinessActivity).apply { text = status; textSize = 14f; setTextColor(Color.parseColor(statusColor)); setPadding(dp(8), 0, 0, 0) })
                 })
                 fun line(label: String, value: String) = TextView(this@CloudBusinessActivity).apply { text = "$label：$value"; textSize = 13f; setTextColor(Color.parseColor("#616161")); setPadding(0, dp(5), 0, 0) }
                 addView(line("订单号", tradeNo))
                 addView(line("下单时间", formatTimestamp(order.optLong("updated_at", order.optLong("created_at")))))
-                addView(line("订单金额", "¥${money(order.optLong("total_amount") + order.optLong("discount_amount"))}"))
-                if (order.optLong("discount_amount") > 0) addView(line("优惠金额", "-¥${money(order.optLong("discount_amount"))}"))
-                if (order.optLong("surplus_amount") > 0) addView(line("旧订阅折抵", "-¥${money(order.optLong("surplus_amount"))}"))
-                addView(TextView(this@CloudBusinessActivity).apply { text = "支付金额：¥${money(order.optLong("total_amount"))}"; textSize = 14f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(8), 0, 0) })
+                addView(line("订单金额", "¥${money(orderOriginalAmount(order))}"))
+                if (order.optLong("discount_amount") > 0) addView(line("优惠金额（优惠券）", "¥${money(order.optLong("discount_amount"))}"))
+                if (order.optLong("surplus_amount") > 0) addView(line("旧订阅折抵金额", "¥${money(order.optLong("surplus_amount"))}"))
+                if (order.optLong("balance_amount") > 0) addView(line("余额", "¥${money(order.optLong("balance_amount"))}"))
+                addView(line("支付金额", "¥${money(order.optLong("total_amount"))}"))
                 if (order.optInt("status") == 0) addView(LinearLayout(this@CloudBusinessActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END; setPadding(0, dp(12), 0, 0)
-                    addView(actionButton("取消", false) { confirmCancel(tradeNo) })
-                    addView(actionButton("付款", true) { lifecycleScope.launch { payExisting(tradeNo) } }, LinearLayout.LayoutParams(dp(100), dp(38)).apply { marginStart = dp(14) })
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END; setPadding(0, dp(12), 0, dp(10))
+                    addView(actionButton("取消", false) { confirmCancel(tradeNo) }, LinearLayout.LayoutParams(dp(100), dp(34)))
+                    addView(actionButton("付款", true) { lifecycleScope.launch { payExisting(tradeNo) } }, LinearLayout.LayoutParams(dp(100), dp(34)).apply { marginStart = dp(20) })
                 })
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
+    }
+
+    private fun orderOriginalAmount(order: JSONObject): Long {
+        val plan = order.optJSONObject("plan") ?: return order.optLong("total_amount")
+        return plan.optLong(order.optString("period"), order.optLong("total_amount"))
     }
 
     private fun actionButton(label: String, primary: Boolean, click: () -> Unit) = TextView(this).apply {
