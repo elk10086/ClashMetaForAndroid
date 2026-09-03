@@ -203,10 +203,10 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
             DayNight.Day -> theme.applyStyle(R.style.AppThemeLight, true)
         }
         when (uiStore.cloudThemeStyle) {
-            0 -> theme.applyStyle(R.style.CloudThemeMinimal, true)
-            1 -> theme.applyStyle(R.style.CloudThemeSakura, true)
-            2 -> theme.applyStyle(R.style.CloudThemeGod, true)
-            3 -> theme.applyStyle(R.style.CloudThemeAnime, true)
+            0 -> theme.applyStyle(if (dayNight == DayNight.Night) R.style.CloudThemeMinimalDark else R.style.CloudThemeMinimalLight, true)
+            1 -> theme.applyStyle(if (dayNight == DayNight.Night) R.style.CloudThemeSakuraDark else R.style.CloudThemeSakuraLight, true)
+            2 -> theme.applyStyle(if (dayNight == DayNight.Night) R.style.CloudThemeGodDark else R.style.CloudThemeGodLight, true)
+            3 -> theme.applyStyle(if (dayNight == DayNight.Night) R.style.CloudThemeAnimeDark else R.style.CloudThemeAnimeLight, true)
         }
         if (dayNight == DayNight.Night && uiStore.pureBlack) {
             theme.applyStyle(R.style.CloudThemePureBlack, true)

@@ -288,10 +288,10 @@ class CloudAuthActivity : AppCompatActivity() {
         val store = UiStore(this)
         setTheme(if (isDark()) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
         when (store.cloudThemeStyle) {
-            0 -> theme.applyStyle(DesignR.style.CloudThemeMinimal, true)
-            1 -> theme.applyStyle(DesignR.style.CloudThemeSakura, true)
-            2 -> theme.applyStyle(DesignR.style.CloudThemeGod, true)
-            3 -> theme.applyStyle(DesignR.style.CloudThemeAnime, true)
+            0 -> theme.applyStyle(if (isDark()) DesignR.style.CloudThemeMinimalDark else DesignR.style.CloudThemeMinimalLight, true)
+            1 -> theme.applyStyle(if (isDark()) DesignR.style.CloudThemeSakuraDark else DesignR.style.CloudThemeSakuraLight, true)
+            2 -> theme.applyStyle(if (isDark()) DesignR.style.CloudThemeGodDark else DesignR.style.CloudThemeGodLight, true)
+            3 -> theme.applyStyle(if (isDark()) DesignR.style.CloudThemeAnimeDark else DesignR.style.CloudThemeAnimeLight, true)
         }
         if (isDark() && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
     }

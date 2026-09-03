@@ -53,10 +53,10 @@ private fun AppCompatActivity.applyCloudTheme() {
     }
     setTheme(if (dark) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
     when (store.cloudThemeStyle) {
-        0 -> theme.applyStyle(DesignR.style.CloudThemeMinimal, true)
-        1 -> theme.applyStyle(DesignR.style.CloudThemeSakura, true)
-        2 -> theme.applyStyle(DesignR.style.CloudThemeGod, true)
-        3 -> theme.applyStyle(DesignR.style.CloudThemeAnime, true)
+        0 -> theme.applyStyle(if (dark) DesignR.style.CloudThemeMinimalDark else DesignR.style.CloudThemeMinimalLight, true)
+        1 -> theme.applyStyle(if (dark) DesignR.style.CloudThemeSakuraDark else DesignR.style.CloudThemeSakuraLight, true)
+        2 -> theme.applyStyle(if (dark) DesignR.style.CloudThemeGodDark else DesignR.style.CloudThemeGodLight, true)
+        3 -> theme.applyStyle(if (dark) DesignR.style.CloudThemeAnimeDark else DesignR.style.CloudThemeAnimeLight, true)
     }
     if (dark && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
 }
@@ -67,6 +67,20 @@ private fun Context.cloudColor(value: String): Int {
         DarkMode.ForceDark -> true
         DarkMode.ForceLight -> false
         DarkMode.Auto -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+    }
+    if (uiStore.cloudThemeStyle >= 0) {
+        val page = resolveThemedColor(android.R.attr.windowBackground)
+        val surface = resolveThemedColor(com.google.android.material.R.attr.colorSurface)
+        val onSurface = resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+        return when (value.uppercase()) {
+            "#FAFAFA" -> if (dark && uiStore.pureBlack) Color.BLACK else page
+            "#FFFFFF", "#F5F5F5" -> surface
+            "#212121", "#000000", "#424242" -> onSurface
+            "#616161", "#757575", "#9E9E9E" -> blendCloudColor(onSurface, surface, .38f)
+            "#EEEEEE", "#E8E8E8" -> blendCloudColor(surface, onSurface, .09f)
+            "#E0E0E0", "#BDBDBD" -> blendCloudColor(surface, onSurface, .18f)
+            else -> Color.parseColor(value)
+        }
     }
     if (!dark) return Color.parseColor(value)
     return when (value.uppercase()) {
@@ -79,6 +93,12 @@ private fun Context.cloudColor(value: String): Int {
         else -> Color.parseColor(value)
     }
 }
+
+private fun blendCloudColor(a: Int, b: Int, ratio: Float): Int = Color.rgb(
+    (Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(),
+    (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(),
+    (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt(),
+)
 
 private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeStyle) {
     0 -> Color.parseColor("#8DB4C9")
