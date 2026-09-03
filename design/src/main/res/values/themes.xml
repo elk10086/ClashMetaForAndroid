@@ -206,7 +206,7 @@
 
     <style name="CloudThemeMinimalLight" parent="CloudThemeMinimal">
         <item name="android:windowBackground">#FFF5F9FB</item>
-        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurface">#FFEAF2F6</item>
         <item name="colorControlNormal">#FF263238</item>
         <item name="colorOnSurface">#FF263238</item>
         <item name="android:textColor">#FF263238</item>
@@ -222,7 +222,7 @@
     </style>
     <style name="CloudThemeSakuraLight" parent="CloudThemeSakura">
         <item name="android:windowBackground">#FFFFF7FA</item>
-        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurface">#FFFFEDF4</item>
         <item name="colorControlNormal">#FF4A2633</item>
         <item name="colorOnSurface">#FF4A2633</item>
         <item name="android:textColor">#FF4A2633</item>
@@ -238,7 +238,7 @@
     </style>
     <style name="CloudThemeGodLight" parent="CloudThemeGod">
         <item name="android:windowBackground">#FFF4FAFD</item>
-        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurface">#FFE8F6FC</item>
         <item name="colorControlNormal">#FF173746</item>
         <item name="colorOnSurface">#FF173746</item>
         <item name="android:textColor">#FF173746</item>
@@ -254,7 +254,7 @@
     </style>
     <style name="CloudThemeAnimeLight" parent="CloudThemeAnime">
         <item name="android:windowBackground">#FFFFFBEE</item>
-        <item name="colorSurface">#FFFFFFFF</item>
+        <item name="colorSurface">#FFFFF4D2</item>
         <item name="colorControlNormal">#FF332A12</item>
         <item name="colorOnSurface">#FF332A12</item>
         <item name="android:textColor">#FF332A12</item>
