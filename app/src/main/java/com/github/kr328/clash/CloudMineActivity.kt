@@ -70,6 +70,9 @@ class CloudMineActivity : AppCompatActivity() {
                 }
             })
             addView(actionRow("刷新服务配置") { confirmRefreshServiceConfig() })
+            addView(actionRow("主题") {
+                startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java))
+            })
             addView(actionRow("设置") {
                 startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
             })
@@ -288,14 +291,20 @@ class CloudBusinessActivity : AppCompatActivity() {
         })
         content.addView(memberCard(subscription), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(20) })
         val list = json.optJSONArray("data") ?: JSONArray()
-        if (list.length() == 0) return addText("暂无可购买套餐")
+        if (list.length() == 0) {
+            addText("暂无可购买套餐\n请稍后刷新重试", 14f, "#757575")
+            return
+        }
+        content.addView(TextView(this).apply {
+            text = "可购买套餐 · ${list.length()}"; textSize = 13f; setTextColor(Color.parseColor("#757575")); setPadding(0, 0, 0, dp(10))
+        })
         repeat(list.length()) { i ->
             val plan = list.optJSONObject(i) ?: return@repeat
             val periods = listOf(
                 "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
                 "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付", "onetime_price" to "一次性",
-            ).filter { plan.optLong(it.first, 0) >= 1000 }
-            if (periods.isNotEmpty()) content.addView(planCard(plan, periods), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+            ).filter { plan.optLong(it.first, 0) > 0 }
+            if (periods.isNotEmpty()) content.addView(planCard(plan, periods), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         }
     }
 
@@ -358,11 +367,14 @@ class CloudBusinessActivity : AppCompatActivity() {
         val rights = parseRights(plan.optString("content"))
         rights.take(3).forEach { right ->
             addView(TextView(this@CloudBusinessActivity).apply {
-                text = right; textSize = 13f; setTextColor(Color.parseColor("#424242")); maxLines = 1; setPadding(0, dp(7), 0, 0)
+                text = "✓  $right"; textSize = 13f; setTextColor(Color.parseColor("#424242")); maxLines = 1; setPadding(0, dp(7), 0, 0)
             })
         }
         if (rights.size > 3) addView(TextView(this@CloudBusinessActivity).apply {
-            text = "还有 ${rights.size - 3} 项权益，点击查看详情"; textSize = 12f; setTextColor(Color.BLACK); setPadding(0, dp(7), 0, 0)
+            text = "还有 ${rights.size - 3} 项权益"; textSize = 12f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(7), 0, 0)
+        })
+        addView(TextView(this@CloudBusinessActivity).apply {
+            text = "查看套餐详情  ›"; textSize = 13f; setTextColor(Color.BLACK); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(12), 0, 0)
         })
     }
 
