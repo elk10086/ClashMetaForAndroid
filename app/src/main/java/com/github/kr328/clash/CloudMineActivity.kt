@@ -20,7 +20,6 @@ import android.widget.ImageView
 import android.widget.GridLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
-import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import android.webkit.WebView
@@ -34,6 +33,7 @@ import com.github.kr328.clash.cloud.CloudSubscription
 import com.github.kr328.clash.cloud.CloudReleaseManager
 import com.github.kr328.clash.design.model.DarkMode
 import com.github.kr328.clash.design.store.UiStore
+import com.github.kr328.clash.design.util.resolveThemedColor
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withProfile
 import com.github.kr328.clash.util.ApplicationObserver
@@ -52,12 +52,12 @@ private fun AppCompatActivity.applyCloudTheme() {
         DarkMode.Auto -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
     }
     setTheme(if (dark) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
-    theme.applyStyle(when (store.cloudThemeStyle) {
-        1 -> DesignR.style.CloudThemeSakura
-        2 -> DesignR.style.CloudThemeGod
-        3 -> DesignR.style.CloudThemeAnime
-        else -> DesignR.style.CloudThemeMinimal
-    }, true)
+    when (store.cloudThemeStyle) {
+        0 -> theme.applyStyle(DesignR.style.CloudThemeMinimal, true)
+        1 -> theme.applyStyle(DesignR.style.CloudThemeSakura, true)
+        2 -> theme.applyStyle(DesignR.style.CloudThemeGod, true)
+        3 -> theme.applyStyle(DesignR.style.CloudThemeAnime, true)
+    }
     if (dark && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
 }
 
@@ -80,14 +80,13 @@ private fun Context.cloudColor(value: String): Int {
     }
 }
 
-private fun Context.cloudPrimaryColor(): Int = Color.parseColor(
-    when (UiStore(this).cloudThemeStyle) {
-        1 -> "#FFB3C9"
-        2 -> "#45B6E5"
-        3 -> "#C9A227"
-        else -> "#8DB4C9"
-    },
-)
+private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeStyle) {
+    0 -> Color.parseColor("#8DB4C9")
+    1 -> Color.parseColor("#FFB3C9")
+    2 -> Color.parseColor("#45B6E5")
+    3 -> Color.parseColor("#C9A227")
+    else -> resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+}
 
 private fun Context.cloudButtonTextColor(): Int = Color.parseColor("#121212")
 
@@ -128,7 +127,10 @@ class CloudMineActivity : AppCompatActivity() {
                 }
             })
             addView(actionRow("刷新服务配置") { confirmRefreshServiceConfig() })
-            addView(actionRow("主题") { open("theme") })
+            addView(actionRow("主题") {
+                startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java))
+            })
+            addView(actionRow("一键换肤") { open("skin") })
             addView(actionRow("设置") {
                 startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
             })
@@ -285,7 +287,7 @@ class CloudBusinessActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applyCloudTheme()
         super.onCreate(savedInstanceState)
-        val pageTitle = mapOf("plans" to "会员中心", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单", "theme" to "主题")[type] ?: ""
+        val pageTitle = mapOf("plans" to "会员中心", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单", "skin" to "一键换肤")[type] ?: ""
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = if (type == "plans") 15 else 14
@@ -338,7 +340,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 "tickets" -> renderTickets(api.tickets())
                 "ticket_detail" -> renderTicketConversation(api.ticketDetails(intent.getStringExtra("ticket_id").orEmpty()))
                 "ticket_create" -> renderTicketCreate()
-                "theme" -> renderTheme()
+                "skin" -> renderSkin()
             }
         } catch (e: Throwable) {
             addText(e.message ?: "加载失败", 14f, "#B00020")
@@ -348,64 +350,66 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderTheme() {
+    private fun renderSkin() {
         val store = UiStore(this)
-        fun sectionTitle(title: String, subtitle: String) = TextView(this).apply {
-            text = "$title\n$subtitle"
-            textSize = 16f
-            setTextColor(cloudColor("#212121"))
-            setTypeface(typeface, Typeface.BOLD)
-            setPadding(dp(2), dp(18), 0, dp(10))
-        }
-        fun choice(label: String, selected: Boolean, onClick: () -> Unit) = TextView(this).apply {
-            text = (if (selected) "✓  " else "") + label
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#212121"))
-            background = if (selected) {
-                GradientDrawable().apply { setColor(cloudPrimaryColor()); cornerRadius = dp(14).toFloat() }
-            } else rounded("#FFFFFF", 14, "#E0E0E0")
-            isClickable = true
-            isFocusable = true
-            setOnClickListener { onClick() }
-        }
-        fun choices(items: List<Pair<String, Boolean>>, onSelect: (Int) -> Unit) =
-            CloudFlowLayout(this, dp(10), dp(10)).apply {
-                items.forEachIndexed { index, item ->
-                    addView(choice(item.first, item.second) { onSelect(index) }, ViewGroup.LayoutParams(dp(126), dp(50)))
-                }
-            }
-
-        content.addView(sectionTitle("主题模式", "与 free_time_new 一致"))
-        val modes = listOf(DarkMode.Auto, DarkMode.ForceLight, DarkMode.ForceDark)
-        content.addView(choices(listOf("跟随系统", "浅色", "深色").mapIndexed { index, label -> label to (store.darkMode == modes[index]) }) { index ->
-            store.darkMode = modes[index]
-            refreshAllThemedActivities()
-            recreate()
-        })
-
-        content.addView(sectionTitle("主题风格", "颜色和字体会随风格同步切换"))
-        content.addView(choices(listOf("极简风", "公主风", "男神风", "二次元").mapIndexed { index, label -> label to (store.cloudThemeStyle == index) }) { index ->
-            store.cloudThemeStyle = index
-            refreshAllThemedActivities()
-            recreate()
-        })
-
+        val values = listOf(-1, 0, 1, 2, 3)
+        val names = listOf("原生主题", "极简风", "公主风", "男神风", "二次元")
+        val descriptions = listOf("保留原来的配色与字体", "日系圆润 · 清爽留白", "樱花粉 · 修长字体", "冰川蓝 · 轻盈字体", "黑金色 · 个性字体")
         content.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(15), dp(10), dp(10), dp(10))
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
             background = roundedCard()
-            addView(LinearLayout(this@CloudBusinessActivity).apply {
-                orientation = LinearLayout.VERTICAL
-                addView(TextView(this@CloudBusinessActivity).apply { text = "纯黑模式"; textSize = 15f; setTextColor(cloudColor("#212121")) })
-                addView(TextView(this@CloudBusinessActivity).apply { text = "深色模式下使用纯黑背景"; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(4), 0, 0) })
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(Switch(this@CloudBusinessActivity).apply {
-                isChecked = store.pureBlack
-                setOnCheckedChangeListener { _, checked -> store.pureBlack = checked; refreshAllThemedActivities(); recreate() }
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "当前皮肤"
+                textSize = 12f; setTextColor(cloudColor("#757575"))
             })
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22) })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = names[values.indexOf(store.cloudThemeStyle).coerceAtLeast(0)]
+                textSize = 22f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudPrimaryColor()); setPadding(0, dp(6), 0, dp(4))
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "选择皮肤后，应用内颜色与字体会立即同步更新"
+                textSize = 13f; setTextColor(cloudColor("#757575"))
+            })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6); bottomMargin = dp(18) })
+
+        names.indices.chunked(2).forEach { rowIndexes ->
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                rowIndexes.forEach { index ->
+                    val selected = store.cloudThemeStyle == values[index]
+                    addView(LinearLayout(this@CloudBusinessActivity).apply {
+                        orientation = LinearLayout.VERTICAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(14), dp(12), dp(14), dp(12))
+                        background = if (selected) GradientDrawable().apply {
+                            setColor(cloudPrimaryColor()); cornerRadius = dp(16).toFloat()
+                        } else rounded("#FFFFFF", 16, "#E0E0E0")
+                        isClickable = true; isFocusable = true
+                        setOnClickListener {
+                            if (!selected) {
+                                store.cloudThemeStyle = values[index]
+                                refreshAllThemedActivities()
+                                recreate()
+                            }
+                        }
+                        addView(TextView(this@CloudBusinessActivity).apply {
+                            text = (if (selected) "✓  " else "") + names[index]
+                            textSize = 16f; setTypeface(typeface, Typeface.BOLD)
+                            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#212121"))
+                        })
+                        addView(TextView(this@CloudBusinessActivity).apply {
+                            text = descriptions[index]; textSize = 12f; setPadding(0, dp(7), 0, 0)
+                            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#757575"))
+                            alpha = if (selected) .72f else 1f
+                        })
+                    }, LinearLayout.LayoutParams(0, dp(94), 1f).apply {
+                        if (index % 2 == 1) marginStart = dp(10)
+                    })
+                }
+                if (rowIndexes.size == 1) addView(View(this@CloudBusinessActivity), LinearLayout.LayoutParams(0, dp(94), 1f).apply { marginStart = dp(10) })
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+        }
     }
 
     private fun refreshAllThemedActivities() {
@@ -421,7 +425,8 @@ class CloudBusinessActivity : AppCompatActivity() {
                 1 -> "sans-serif-condensed"
                 2 -> "sans-serif-light"
                 3 -> "sans-serif"
-                else -> "sans-serif-rounded"
+                0 -> "sans-serif-rounded"
+                else -> "sans-serif"
             }
             view.typeface = Typeface.create(family, style)
         }

@@ -287,19 +287,20 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun applySelectedTheme() {
         val store = UiStore(this)
         setTheme(if (isDark()) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
-        theme.applyStyle(when (store.cloudThemeStyle) {
-            1 -> DesignR.style.CloudThemeSakura
-            2 -> DesignR.style.CloudThemeGod
-            3 -> DesignR.style.CloudThemeAnime
-            else -> DesignR.style.CloudThemeMinimal
-        }, true)
+        when (store.cloudThemeStyle) {
+            0 -> theme.applyStyle(DesignR.style.CloudThemeMinimal, true)
+            1 -> theme.applyStyle(DesignR.style.CloudThemeSakura, true)
+            2 -> theme.applyStyle(DesignR.style.CloudThemeGod, true)
+            3 -> theme.applyStyle(DesignR.style.CloudThemeAnime, true)
+        }
         if (isDark() && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
     }
     private fun themeTypeface(style: Int): Typeface = Typeface.create(when (UiStore(this).cloudThemeStyle) {
         1 -> "sans-serif-condensed"
         2 -> "sans-serif-light"
         3 -> "sans-serif"
-        else -> "sans-serif-rounded"
+        0 -> "sans-serif-rounded"
+        else -> "sans-serif"
     }, style)
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }

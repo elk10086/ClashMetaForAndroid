@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Match hle_fi/free_time_new's default Japanese-minimal seed. -->
-    <color name="color_clash_light">#5B7482</color>
-    <color name="color_clash_dark">#8DB4C9</color>
+    <color name="color_clash_light">#1e4376</color>
+    <color name="color_clash_dark">#1976d2</color>
     <color name="color_system_ui_overlay">#50000000</color>
     <color name="color_light_background">#FFFAFAFA</color>
     <color name="color_dark_background">#FF121212</color>
@@ -14,4 +13,5 @@
     <color name="theme_sakura">#FFFFB3C9</color>
     <color name="theme_god">#FF45B6E5</color>
     <color name="theme_anime">#FFC9A227</color>
+    <color name="theme_minimal">#FF8DB4C9</color>
 </resources>

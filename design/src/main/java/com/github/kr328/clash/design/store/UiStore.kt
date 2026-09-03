@@ -23,14 +23,13 @@ class UiStore(context: Context) {
 
     var darkMode: DarkMode by store.enum(
         key = "dark_mode",
-        // free_time_new starts in dark mode; users can still select system or light.
-        defaultValue = DarkMode.ForceDark,
+        defaultValue = DarkMode.Auto,
         values = DarkMode.values()
     )
 
     var cloudThemeStyle: Int by store.int(
         key = "cloud_theme_style",
-        defaultValue = 0,
+        defaultValue = -1,
     )
 
     var pureBlack: Boolean by store.boolean(

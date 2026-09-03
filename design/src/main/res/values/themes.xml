@@ -172,8 +172,8 @@
     </style>
 
     <style name="CloudThemeMinimal">
-        <item name="colorPrimary">@color/color_clash_dark</item>
-        <item name="colorSecondary">@color/color_clash_dark</item>
+        <item name="colorPrimary">@color/theme_minimal</item>
+        <item name="colorSecondary">@color/theme_minimal</item>
         <item name="colorOnPrimary">#FF121212</item>
         <item name="android:fontFamily">sans-serif-rounded</item>
         <item name="fontFamily">sans-serif-rounded</item>
