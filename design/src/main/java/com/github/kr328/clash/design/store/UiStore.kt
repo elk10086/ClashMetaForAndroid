@@ -23,7 +23,8 @@ class UiStore(context: Context) {
 
     var darkMode: DarkMode by store.enum(
         key = "dark_mode",
-        defaultValue = DarkMode.Auto,
+        // free_time_new starts in dark mode; users can still select system or light.
+        defaultValue = DarkMode.ForceDark,
         values = DarkMode.values()
     )
 
