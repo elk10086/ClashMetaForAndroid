@@ -74,12 +74,28 @@ class CloudApi(private val context: Context) {
 
     suspend fun plans(): JSONObject = authenticatedGet("/api/v1/user/plan/fetch")
     suspend fun orders(): JSONObject = authenticatedGet("/api/v1/user/order/fetch")
+    suspend fun orderDetails(tradeNo: String): JSONObject = authenticatedGet(
+        "/api/v1/user/order/detail",
+        mapOf("trade_no" to tradeNo),
+    )
     suspend fun paymentMethods(): JSONObject = authenticatedGet("/api/v1/user/order/getPaymentMethod")
+    suspend fun checkCoupon(code: String, planId: String): JSONObject = authenticatedPost(
+        "/api/v1/user/coupon/check",
+        mapOf("code" to code, "plan_id" to planId),
+    )
     suspend fun inviteSummary(): JSONObject = authenticatedGet("/api/v1/user/invite/fetch")
     suspend fun inviteDetails(): JSONObject = authenticatedGet("/api/v1/user/invite/details")
     suspend fun createInviteCode(): JSONObject = authenticatedGet("/api/v1/user/invite/save")
     suspend fun tickets(): JSONObject = authenticatedGet("/api/v1/user/ticket/fetch")
+    suspend fun ticketDetails(id: String): JSONObject = authenticatedGet(
+        "/api/v1/user/ticket/fetch",
+        mapOf("id" to id),
+    )
     suspend fun userInfo(): JSONObject = authenticatedGet("/api/v1/user/info")
+
+    fun clearRemoteConfigCache() {
+        prefs.edit().remove("base_url").apply()
+    }
 
     suspend fun remoteConfig(): JSONObject = withContext(Dispatchers.IO) {
         configUrls.mapNotNull { url -> runCatching { readConfigDocument(url) }.getOrNull() }

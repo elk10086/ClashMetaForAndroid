@@ -68,6 +68,7 @@ class CloudMineActivity : AppCompatActivity() {
                         .onFailure { toast(it) }
                 }
             })
+            addView(actionRow("刷新服务配置") { confirmRefreshServiceConfig() })
             addView(actionRow("设置") {
                 startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
             })
@@ -113,6 +114,22 @@ class CloudMineActivity : AppCompatActivity() {
             .setMessage(DesignR.string.cloud_logout_confirm)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ -> performLogout() }
+            .show()
+    }
+
+    private fun confirmRefreshServiceConfig() {
+        AlertDialog.Builder(this)
+            .setTitle("刷新服务配置")
+            .setMessage("清除当前缓存并重新获取远端服务地址？")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("刷新") { _, _ ->
+                CloudApi(this).clearRemoteConfigCache()
+                lifecycleScope.launch {
+                    runCatching { CloudApi(this@CloudMineActivity).remoteConfig() }
+                        .onSuccess { Toast.makeText(this@CloudMineActivity, "服务配置已刷新", Toast.LENGTH_SHORT).show() }
+                        .onFailure { toast(it) }
+                }
+            }
             .show()
     }
 
@@ -354,11 +371,32 @@ class CloudBusinessActivity : AppCompatActivity() {
     private fun choosePeriod(plan: JSONObject, periods: List<Pair<String, String>>) {
         AlertDialog.Builder(this).setTitle("选择购买周期")
             .setItems(periods.map { "${it.second}  ¥${money(plan.optLong(it.first))}" }.toTypedArray()) { _, which ->
-                lifecycleScope.launch { createAndPay(plan.optString("id"), periods[which].first) }
+                askCoupon(plan.optString("id"), periods[which].first)
             }.show()
     }
 
-    private suspend fun createAndPay(planId: String, period: String) {
+    private fun askCoupon(planId: String, period: String) {
+        val input = EditText(this).apply { hint = "优惠码（选填）"; isSingleLine = true }
+        AlertDialog.Builder(this).setTitle("确认订单").setView(input)
+            .setNegativeButton("取消", null)
+            .setNeutralButton("无优惠码") { _, _ -> lifecycleScope.launch { createAndPay(planId, period, "") } }
+            .setPositiveButton("继续") { _, _ ->
+                lifecycleScope.launch {
+                    val coupon = input.text.toString().trim()
+                    if (coupon.isNotEmpty()) {
+                        val result = runCatching { api.checkCoupon(coupon, planId) }
+                        if (result.isFailure) return@launch toast(result.exceptionOrNull()!!)
+                        val response = result.getOrThrow()
+                        if (response.isNull("data") || response.opt("data") == false) {
+                            return@launch toast(IllegalStateException(response.optString("message", "优惠码无效")))
+                        }
+                    }
+                    createAndPay(planId, period, coupon)
+                }
+            }.show()
+    }
+
+    private suspend fun createAndPay(planId: String, period: String, coupon: String) {
         try {
             val methods = api.paymentMethods().optJSONArray("data") ?: JSONArray()
             if (methods.length() == 0) throw IllegalStateException("暂无可用支付方式")
@@ -366,7 +404,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             AlertDialog.Builder(this).setTitle("选择支付方式").setItems(names) { _, which ->
                 lifecycleScope.launch {
                     try {
-                        val order = api.createOrder(planId, period)
+                        val order = api.createOrder(planId, period, coupon)
                         val tradeNo = order.optString("data")
                         val method = methods.optJSONObject(which)?.optString("id").orEmpty()
                         val pay = api.checkout(tradeNo, method)
@@ -388,15 +426,34 @@ class CloudBusinessActivity : AppCompatActivity() {
             val status = when (order.optInt("status")) { 0 -> "待支付"; 1 -> "已支付"; 2 -> "已取消"; else -> "已完成" }
             addCard(plan?.optString("name") ?: "订单", "订单号：${order.optString("trade_no")}\n$status · ¥${money(order.optLong("total_amount"))}") {
                 if (order.optInt("status") == 0) orderActions(order.optString("trade_no"))
+                else showOrderDetails(order.optString("trade_no"))
             }
         }
     }
 
     private fun orderActions(tradeNo: String) {
         AlertDialog.Builder(this).setTitle("待支付订单")
-            .setItems(arrayOf("继续支付", "取消订单")) { _, which ->
-                if (which == 0) lifecycleScope.launch { payExisting(tradeNo) } else confirmCancel(tradeNo)
+            .setItems(arrayOf("查看详情", "继续支付", "取消订单")) { _, which ->
+                when (which) {
+                    0 -> showOrderDetails(tradeNo)
+                    1 -> lifecycleScope.launch { payExisting(tradeNo) }
+                    else -> confirmCancel(tradeNo)
+                }
             }.show()
+    }
+
+    private fun showOrderDetails(tradeNo: String) = lifecycleScope.launch {
+        runCatching { api.orderDetails(tradeNo) }.onSuccess { response ->
+            val order = response.optJSONObject("data") ?: response
+            val plan = order.optJSONObject("plan")?.optString("name").orEmpty()
+            val detail = buildString {
+                if (plan.isNotBlank()) append("套餐：$plan\n")
+                append("订单号：${order.optString("trade_no", tradeNo)}\n")
+                append("金额：¥${money(order.optLong("total_amount"))}\n")
+                append("创建时间：${order.optString("created_at", "-")}")
+            }
+            AlertDialog.Builder(this@CloudBusinessActivity).setTitle("订单详情").setMessage(detail).setPositiveButton("关闭", null).show()
+        }.onFailure { toast(it) }
     }
 
     private suspend fun payExisting(tradeNo: String) {
@@ -445,6 +502,13 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
         val users = details.optJSONArray("data") ?: JSONArray()
         addText("已邀请 ${users.length()} 人", 15f, "#212121")
+        repeat(users.length()) { index ->
+            val invited = users.optJSONObject(index) ?: return@repeat
+            addCard(
+                "返利订单 ${invited.optString("trade_no", "-")}",
+                "订单金额：¥${money(invited.optLong("order_amount"))}\n获得佣金：¥${money(invited.optLong("get_amount"))}\n时间：${formatTimestamp(invited.optLong("created_at"))}",
+            ) {}
+        }
     }
 
     private fun renderTickets(json: JSONObject) {
@@ -455,9 +519,27 @@ class CloudBusinessActivity : AppCompatActivity() {
         repeat(list.length()) { i ->
             val item = list.optJSONObject(i) ?: return@repeat
             addCard(item.optString("subject", "工单"), "${item.optString("message")}\n状态：${if (item.optInt("status") == 0) "处理中" else "已关闭"}") {
-                if (item.optInt("status") == 0) ticketActions(item.optString("id"))
+                showTicketDetails(item.optString("id"), item.optInt("status") == 0)
             }
         }
+    }
+
+    private fun showTicketDetails(id: String, open: Boolean) = lifecycleScope.launch {
+        runCatching { api.ticketDetails(id) }.onSuccess { response ->
+            val data = response.optJSONObject("data") ?: response
+            val messages = data.optJSONArray("message") ?: data.optJSONArray("messages") ?: JSONArray()
+            val history = buildString {
+                append(data.optString("subject", "工单详情"))
+                repeat(messages.length()) { index ->
+                    val message = messages.optJSONObject(index) ?: return@repeat
+                    append("\n\n${message.optString("message")}")
+                    message.optString("created_at").takeIf { it.isNotBlank() }?.let { append("\n$it") }
+                }
+            }
+            val builder = AlertDialog.Builder(this@CloudBusinessActivity).setTitle("工单详情").setMessage(history).setNegativeButton("关闭", null)
+            if (open) builder.setPositiveButton("操作") { _, _ -> ticketActions(id) }
+            builder.show()
+        }.onFailure { toast(it) }
     }
 
     private fun ticketActions(id: String) {
@@ -501,6 +583,8 @@ class CloudBusinessActivity : AppCompatActivity() {
         content.addView(TextView(this).apply { text = value; textSize = size; setTextColor(Color.parseColor(color)); gravity = Gravity.CENTER; setPadding(0, dp(18), 0, dp(18)) })
     }
     private fun money(cents: Long) = String.format(java.util.Locale.US, "%.2f", cents / 100.0)
+    private fun formatTimestamp(timestamp: Long) = if (timestamp <= 0) "-" else
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
     private fun roundedCard() = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.parseColor("#E0E0E0")) }
     private fun rounded(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
         setColor(Color.parseColor(fill)); cornerRadius = dp(radius).toFloat()
