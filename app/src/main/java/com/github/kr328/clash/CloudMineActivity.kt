@@ -504,8 +504,16 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     @Suppress("DEPRECATION")
-    private fun parseRights(raw: String): List<String> = Html.fromHtml(raw.replace("<br>", "\n").replace("<br/>", "\n"))
-        .toString().lines().map { it.trim() }.filter { it.isNotBlank() }
+    private fun parseRights(raw: String): List<String> {
+        if (raw.isBlank()) return emptyList()
+        val normalized = raw
+            .replace("\n", "")
+            .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+            .replace(Regex("&#x2714;?", RegexOption.IGNORE_CASE), "✅")
+        return normalized.lines()
+            .map { Html.fromHtml(it).toString().trim() }
+            .filter { it.isNotEmpty() && Regex("^[①②③④⑤⑥⑦⑧⑨]").containsMatchIn(it) }
+    }
 
     private fun maskBusinessEmail(value: String): String {
         val parts = value.split('@')
