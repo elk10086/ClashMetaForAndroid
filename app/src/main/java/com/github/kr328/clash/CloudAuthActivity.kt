@@ -9,9 +9,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -22,6 +25,7 @@ import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudTestAccount
+import com.github.kr328.clash.cloud.CloudReleaseManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.github.kr328.clash.design.R as DesignR
@@ -40,7 +44,10 @@ class CloudAuthActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (CloudSession(this).loggedIn) return finish()
+        window.statusBarColor = backgroundColor()
+        window.navigationBarColor = backgroundColor()
         render()
+        lifecycleScope.launch { runCatching { CloudReleaseManager.showAnnouncement(this@CloudAuthActivity, automatic = true) } }
     }
 
     @Suppress("DEPRECATION")
@@ -62,7 +69,12 @@ class CloudAuthActivity : AppCompatActivity() {
 
     private fun loginPage(): View {
         val mail = input(getString(DesignR.string.cloud_auth_email), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
-        mail.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.cloud_clear, 0)
+        updateClearIcon(mail)
+        mail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = updateClearIcon(mail)
+            override fun afterTextChanged(s: Editable?) = Unit
+        })
         mail.setOnTouchListener { _, event ->
             if (event.action == android.view.MotionEvent.ACTION_UP && event.x >= mail.width - mail.compoundPaddingEnd && mail.text.isNotEmpty()) {
                 mail.text.clear(); true
@@ -83,7 +95,7 @@ class CloudAuthActivity : AppCompatActivity() {
             layoutParams = lp(minOf(resources.displayMetrics.widthPixels - dp(56), dp(440)), -2)
             addView(TextView(this@CloudAuthActivity).apply {
                 text = getString(DesignR.string.cloud_brand); gravity = Gravity.CENTER; textSize = 32f
-                setTypeface(typeface, Typeface.BOLD); setTextColor(Color.WHITE); letterSpacing = .08f
+                typeface = Typeface.create("sans-serif-black", Typeface.BOLD); setTextColor(Color.WHITE); letterSpacing = .08f
                 post {
                     paint.shader = LinearGradient(0f, 0f, width.toFloat(), 0f, intArrayOf(Color.rgb(45, 121, 251), Color.rgb(50, 87, 255), Color.rgb(36, 212, 243)), null, Shader.TileMode.CLAMP)
                     invalidate()
@@ -96,10 +108,10 @@ class CloudAuthActivity : AppCompatActivity() {
                     } else lastBrandTapAt = now
                 }
             })
-            addView(link(getString(DesignR.string.cloud_official_site), underline = true) {
+            addView(link(getString(DesignR.string.cloud_official_site), underline = true, bold = false) {
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://zhuiyun.one"))) }
                     .onFailure { toast(getString(DesignR.string.cloud_operation_failed)) }
-            }, lp(-2, dp(40)))
+            }, LinearLayout.LayoutParams(-2, dp(40)).apply { gravity = Gravity.CENTER_HORIZONTAL })
             addSpace(34); addView(mail); addSpace(18); addView(password); addSpace(40)
             addView(primaryButton(getString(DesignR.string.cloud_auth_login), login = true) {
                 runBusy {
@@ -113,8 +125,8 @@ class CloudAuthActivity : AppCompatActivity() {
             addSpace(12)
             addView(LinearLayout(this@CloudAuthActivity).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                addView(link(getString(DesignR.string.cloud_create_account)) { resetting = false; step = Step.REGISTER_EMAIL; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
-                addView(link(getString(DesignR.string.cloud_auth_forgot)) { resetting = true; step = Step.RESET_EMAIL; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+                addView(link(getString(DesignR.string.cloud_create_account), gravity = Gravity.START or Gravity.CENTER_VERTICAL) { resetting = false; step = Step.REGISTER_EMAIL; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
+                addView(link(getString(DesignR.string.cloud_auth_forgot), color = secondary(), bold = false, gravity = Gravity.END or Gravity.CENTER_VERTICAL) { resetting = true; step = Step.RESET_EMAIL; render() }, LinearLayout.LayoutParams(0, dp(48), 1f))
             })
         }
         val body = vertical().apply {
@@ -188,13 +200,19 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun page(content: View, footer: Boolean = false) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(blend(backgroundColor(), accent(), .05f), backgroundColor(), backgroundColor()))
-        addView(ScrollView(this@CloudAuthActivity).apply { isFillViewport = true; addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        addView(FrameLayout(this@CloudAuthActivity).apply {
+            addView(ScrollView(this@CloudAuthActivity).apply { isFillViewport = true; addView(content) }, FrameLayout.LayoutParams(-1, -1))
+            if (footer) addView(serviceButton(), FrameLayout.LayoutParams(dp(56), dp(56), Gravity.END or Gravity.BOTTOM).apply {
+                marginEnd = dp(16); bottomMargin = dp(16)
+            })
+        }, LinearLayout.LayoutParams(-1, 0, 1f))
         if (footer) addView(TextView(this@CloudAuthActivity).apply { text = getString(DesignR.string.cloud_current_version, packageManager.getPackageInfo(packageName, 0).versionName); gravity = Gravity.CENTER; textSize = 12f; setTextColor(secondary()) }, lp(-1, dp(32)))
     }
 
     private fun input(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
         this.hint = hint; inputType = type; textSize = 16f; setTextColor(foreground()); setHintTextColor(secondary())
-        background = rounded(surface(), 16, outline()); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58))
+        isSingleLine = true; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        background = rounded(surface(), 16, blend(outline(), backgroundColor(), .65f)); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58)); elevation = dp(5).toFloat()
     }
 
     private fun flowInput(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
@@ -203,17 +221,33 @@ class CloudAuthActivity : AppCompatActivity() {
     }
 
     private fun primaryButton(label: String, login: Boolean = false, action: () -> Unit) = TextView(this).apply {
-        text = label; textSize = if (login) 17f else 15f; if (login) setTypeface(typeface, Typeface.BOLD); setTextColor(Color.WHITE); gravity = Gravity.CENTER
-        background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(Color.rgb(50, 87, 255), Color.rgb(36, 212, 243))).apply { cornerRadius = dp(if (login) 28 else 25).toFloat() }
+        text = label; textSize = if (login) 17f else 15f; if (login) setTypeface(typeface, Typeface.BOLD); setTextColor(Color.WHITE); gravity = Gravity.CENTER; letterSpacing = if (login) .07f else 0f
+        background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(accent(), blend(accent(), tertiary(), .45f))).apply { cornerRadius = dp(if (login) 28 else 25).toFloat() }
+        if (login) elevation = dp(12).toFloat()
         setOnClickListener { if (!busy) action() }; layoutParams = lp(-1, dp(if (login) 56 else 50))
     }
     private fun outlineButton(label: String, action: () -> Unit) = TextView(this).apply { text = label; textSize = 15f; setTextColor(accent()); gravity = Gravity.CENTER; background = rounded(Color.TRANSPARENT, 25, outline()); setOnClickListener { if (!busy) action() }; layoutParams = lp(-1, dp(50)) }
-    private fun link(label: String, underline: Boolean = false, action: () -> Unit) = TextView(this).apply { text = label; textSize = if (underline) 14f else 15f; setTextColor(accent()); gravity = Gravity.CENTER; if (!underline) setTypeface(typeface, Typeface.BOLD) else paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG; setOnClickListener { action() } }
+    private fun link(label: String, underline: Boolean = false, color: Int = accent(), bold: Boolean = true, gravity: Int = Gravity.CENTER, action: () -> Unit) = TextView(this).apply { text = label; textSize = if (underline) 14f else 15f; setTextColor(color); this.gravity = gravity; if (bold) setTypeface(typeface, Typeface.BOLD); if (underline) paintFlags = paintFlags or android.graphics.Paint.UNDERLINE_TEXT_FLAG; setOnClickListener { action() } }
     private fun LinearLayout.heading(title: String, subtitle: String) { addView(TextView(this@CloudAuthActivity).apply { text = title; textSize = 20f; setTypeface(typeface, Typeface.BOLD); setTextColor(foreground()) }); addSpace(6); addView(TextView(this@CloudAuthActivity).apply { text = subtitle; textSize = 13f; setTextColor(foreground()) }); addSpace(28) }
     private fun vertical() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     private fun LinearLayout.addSpace(height: Int) = addView(View(this@CloudAuthActivity), lp(1, dp(height)))
     private fun lp(width: Int, height: Int) = LinearLayout.LayoutParams(width, height)
     private fun rounded(color: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(dp(1), it) } }
+    private fun updateClearIcon(field: EditText) = field.setCompoundDrawablesWithIntrinsicBounds(0, 0, if (field.text.isNullOrEmpty()) 0 else R.drawable.cloud_clear, 0)
+    private fun serviceButton() = ImageView(this).apply {
+        setImageResource(R.drawable.cloud_headset)
+        setPadding(dp(14), dp(14), dp(14), dp(14))
+        background = rounded(accent(), 28)
+        elevation = dp(5).toFloat()
+        contentDescription = "线上客服"
+        setOnClickListener {
+            lifecycleScope.launch {
+                val remote = runCatching { CloudReleaseManager.customerServiceUrl(this@CloudAuthActivity) }.getOrDefault("")
+                val url = remote.ifBlank { "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f" }
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure { toast(getString(DesignR.string.cloud_operation_failed)) }
+            }
+        }
+    }
     private fun runBusy(block: suspend () -> Unit) { if (busy) return; busy = true; lifecycleScope.launch { try { block() } catch (e: Throwable) { toast(e.message ?: getString(DesignR.string.cloud_operation_failed)) } finally { busy = false } } }
     private fun validEmail(value: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(value).matches()
     private fun showTestAccounts(emailField: EditText) {
@@ -236,6 +270,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun secondary() = if (isDark()) Color.rgb(164, 173, 189) else Color.rgb(93, 93, 109)
     private fun outline() = if (isDark()) Color.rgb(73, 77, 103) else Color.rgb(224, 226, 232)
     private fun accent() = Color.rgb(50, 87, 255)
+    private fun tertiary() = Color.rgb(36, 212, 243)
     private fun isDark() = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }
