@@ -28,6 +28,16 @@ class UiStore(context: Context) {
         values = DarkMode.values()
     )
 
+    var cloudThemeStyle: Int by store.int(
+        key = "cloud_theme_style",
+        defaultValue = 0,
+    )
+
+    var pureBlack: Boolean by store.boolean(
+        key = "pure_black",
+        defaultValue = false,
+    )
+
     var hideAppIcon: Boolean by store.boolean(
         key = "hide_app_icon",
         defaultValue = context.packageManager.getComponentEnabledSetting(context.mainActivityAlias)

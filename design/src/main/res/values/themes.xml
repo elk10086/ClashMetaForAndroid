@@ -170,4 +170,37 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+
+    <style name="CloudThemeMinimal">
+        <item name="colorPrimary">@color/color_clash_dark</item>
+        <item name="colorSecondary">@color/color_clash_dark</item>
+        <item name="android:fontFamily">sans-serif-rounded</item>
+        <item name="fontFamily">sans-serif-rounded</item>
+    </style>
+
+    <style name="CloudThemeSakura">
+        <item name="colorPrimary">@color/theme_sakura</item>
+        <item name="colorSecondary">@color/theme_sakura</item>
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="fontFamily">sans-serif-condensed</item>
+    </style>
+
+    <style name="CloudThemeGod">
+        <item name="colorPrimary">@color/theme_god</item>
+        <item name="colorSecondary">@color/theme_god</item>
+        <item name="android:fontFamily">sans-serif-light</item>
+        <item name="fontFamily">sans-serif-light</item>
+    </style>
+
+    <style name="CloudThemeAnime">
+        <item name="colorPrimary">@color/theme_anime</item>
+        <item name="colorSecondary">@color/theme_anime</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="fontFamily">sans-serif</item>
+    </style>
+
+    <style name="CloudThemePureBlack">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="colorSurface">@android:color/black</item>
+    </style>
 </resources>

@@ -202,6 +202,15 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
             DayNight.Night -> theme.applyStyle(R.style.AppThemeDark, true)
             DayNight.Day -> theme.applyStyle(R.style.AppThemeLight, true)
         }
+        theme.applyStyle(when (uiStore.cloudThemeStyle) {
+            1 -> R.style.CloudThemeSakura
+            2 -> R.style.CloudThemeGod
+            3 -> R.style.CloudThemeAnime
+            else -> R.style.CloudThemeMinimal
+        }, true)
+        if (dayNight == DayNight.Night && uiStore.pureBlack) {
+            theme.applyStyle(R.style.CloudThemePureBlack, true)
+        }
 
         window.isAllowForceDarkCompat = false
         window.isSystemBarsTranslucentCompat = true

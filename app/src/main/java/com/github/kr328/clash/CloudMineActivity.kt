@@ -20,6 +20,7 @@ import android.widget.ImageView
 import android.widget.GridLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import android.webkit.WebView
@@ -43,15 +44,24 @@ import org.json.JSONObject
 import com.github.kr328.clash.design.R as DesignR
 
 private fun AppCompatActivity.applyCloudTheme() {
-    val dark = when (UiStore(this).darkMode) {
+    val store = UiStore(this)
+    val dark = when (store.darkMode) {
         DarkMode.ForceDark -> true
         DarkMode.ForceLight -> false
         DarkMode.Auto -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
     }
     setTheme(if (dark) DesignR.style.AppThemeDark else DesignR.style.AppThemeLight)
+    theme.applyStyle(when (store.cloudThemeStyle) {
+        1 -> DesignR.style.CloudThemeSakura
+        2 -> DesignR.style.CloudThemeGod
+        3 -> DesignR.style.CloudThemeAnime
+        else -> DesignR.style.CloudThemeMinimal
+    }, true)
+    if (dark && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
 }
 
 private fun Context.cloudColor(value: String): Int {
+    val uiStore = UiStore(this)
     val dark = when (UiStore(this).darkMode) {
         DarkMode.ForceDark -> true
         DarkMode.ForceLight -> false
@@ -59,7 +69,7 @@ private fun Context.cloudColor(value: String): Int {
     }
     if (!dark) return Color.parseColor(value)
     return when (value.uppercase()) {
-        "#FAFAFA" -> Color.parseColor("#121212")
+        "#FAFAFA" -> Color.parseColor(if (uiStore.pureBlack) "#000000" else "#121212")
         "#FFFFFF", "#F5F5F5" -> Color.parseColor("#202020")
         "#212121", "#000000", "#424242" -> Color.parseColor("#F5F5F5")
         "#616161", "#757575", "#9E9E9E" -> Color.parseColor("#B8B8B8")
@@ -68,6 +78,15 @@ private fun Context.cloudColor(value: String): Int {
         else -> Color.parseColor(value)
     }
 }
+
+private fun Context.cloudPrimaryColor(): Int = Color.parseColor(
+    when (UiStore(this).cloudThemeStyle) {
+        1 -> "#FFB3C9"
+        2 -> "#45B6E5"
+        3 -> "#C9A227"
+        else -> "#8DB4C9"
+    },
+)
 
 private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).darkMode == DarkMode.ForceDark ||
     UiStore(this).darkMode == DarkMode.Auto && resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
@@ -108,9 +127,7 @@ class CloudMineActivity : AppCompatActivity() {
                 }
             })
             addView(actionRow("刷新服务配置") { confirmRefreshServiceConfig() })
-            addView(actionRow("主题") {
-                startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java))
-            })
+            addView(actionRow("主题") { open("theme") })
             addView(actionRow("设置") {
                 startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
             })
@@ -262,7 +279,7 @@ class CloudBusinessActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applyCloudTheme()
         super.onCreate(savedInstanceState)
-        val pageTitle = mapOf("plans" to "会员中心", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单")[type] ?: ""
+        val pageTitle = mapOf("plans" to "会员中心", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单", "theme" to "主题")[type] ?: ""
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             val horizontal = if (type == "plans") 15 else 14
@@ -315,10 +332,86 @@ class CloudBusinessActivity : AppCompatActivity() {
                 "tickets" -> renderTickets(api.tickets())
                 "ticket_detail" -> renderTicketConversation(api.ticketDetails(intent.getStringExtra("ticket_id").orEmpty()))
                 "ticket_create" -> renderTicketCreate()
+                "theme" -> renderTheme()
             }
         } catch (e: Throwable) {
             addText(e.message ?: "加载失败", 14f, "#B00020")
-        } finally { loading.visibility = View.GONE }
+        } finally {
+            loading.visibility = View.GONE
+            applyCloudTypeface(pageRoot)
+        }
+    }
+
+    private fun renderTheme() {
+        val store = UiStore(this)
+        fun sectionTitle(title: String, subtitle: String) = TextView(this).apply {
+            text = "$title\n$subtitle"
+            textSize = 16f
+            setTextColor(cloudColor("#212121"))
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(2), dp(18), 0, dp(10))
+        }
+        fun choice(label: String, selected: Boolean, onClick: () -> Unit) = TextView(this).apply {
+            text = (if (selected) "✓  " else "") + label
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#212121"))
+            background = if (selected) {
+                GradientDrawable().apply { setColor(cloudPrimaryColor()); cornerRadius = dp(14).toFloat() }
+            } else rounded("#FFFFFF", 14, "#E0E0E0")
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { onClick() }
+        }
+        fun choices(items: List<Pair<String, Boolean>>, onSelect: (Int) -> Unit) =
+            CloudFlowLayout(this, dp(10), dp(10)).apply {
+                items.forEachIndexed { index, item ->
+                    addView(choice(item.first, item.second) { onSelect(index) }, ViewGroup.LayoutParams(dp(126), dp(50)))
+                }
+            }
+
+        content.addView(sectionTitle("主题模式", "与 free_time_new 一致"))
+        val modes = listOf(DarkMode.Auto, DarkMode.ForceLight, DarkMode.ForceDark)
+        content.addView(choices(listOf("跟随系统", "浅色", "深色").mapIndexed { index, label -> label to (store.darkMode == modes[index]) }) { index ->
+            store.darkMode = modes[index]
+            recreate()
+        })
+
+        content.addView(sectionTitle("主题风格", "颜色和字体会随风格同步切换"))
+        content.addView(choices(listOf("极简风", "公主风", "男神风", "二次元").mapIndexed { index, label -> label to (store.cloudThemeStyle == index) }) { index ->
+            store.cloudThemeStyle = index
+            recreate()
+        })
+
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(15), dp(10), dp(10), dp(10))
+            background = roundedCard()
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@CloudBusinessActivity).apply { text = "纯黑模式"; textSize = 15f; setTextColor(cloudColor("#212121")) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = "深色模式下使用纯黑背景"; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(4), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(Switch(this@CloudBusinessActivity).apply {
+                isChecked = store.pureBlack
+                setOnCheckedChangeListener { _, checked -> store.pureBlack = checked; recreate() }
+            })
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(22) })
+    }
+
+    private fun applyCloudTypeface(view: View) {
+        if (view is TextView) {
+            val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
+            val family = when (UiStore(this).cloudThemeStyle) {
+                1 -> "sans-serif-condensed"
+                2 -> "sans-serif-light"
+                3 -> "sans-serif"
+                else -> "sans-serif-rounded"
+            }
+            view.typeface = Typeface.create(family, style)
+        }
+        if (view is ViewGroup) repeat(view.childCount) { applyCloudTypeface(view.getChildAt(it)) }
     }
 
     private suspend fun loadPlansWithCache(): JSONObject {
