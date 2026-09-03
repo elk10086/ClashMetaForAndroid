@@ -110,6 +110,23 @@ private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeSty
 
 private fun Context.cloudButtonTextColor(): Int = Color.parseColor("#121212")
 
+private fun Context.applyCloudTypography(view: View) {
+    val skin = UiStore(this).cloudThemeStyle
+    if (skin < 0) return
+    if (view is TextView) {
+        val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
+        view.typeface = Typeface.create(when (skin) {
+            0 -> "sans-serif-rounded"
+            1 -> "sans-serif-condensed"
+            2 -> "sans-serif-light"
+            else -> "sans-serif"
+        }, style)
+        view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
+        view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
+    }
+    if (view is ViewGroup) repeat(view.childCount) { applyCloudTypography(view.getChildAt(it)) }
+}
+
 class CloudMineActivity : AppCompatActivity() {
     private lateinit var expiryView: TextView
     private var appliedThemeSignature = ""
@@ -164,7 +181,7 @@ class CloudMineActivity : AppCompatActivity() {
                 CloudBottomNavigation.create(this@CloudMineActivity, CloudBottomNavigation.Tab.MINE),
                 LinearLayout.LayoutParams(-1, dp(80)),
             )
-        })
+        }.also { applyCloudTypography(it) })
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
                 val text = if (subscription.expiresAt > 0) {
@@ -366,7 +383,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             addText(e.message ?: "加载失败", 14f, "#B00020")
         } finally {
             loading.visibility = View.GONE
-            applyCloudTypeface(pageRoot)
+            applyCloudTypography(pageRoot)
         }
     }
 
@@ -436,21 +453,6 @@ class CloudBusinessActivity : AppCompatActivity() {
         ApplicationObserver.createdActivities.toList().forEach { activity ->
             if (!activity.isFinishing && !activity.isDestroyed) activity.recreate()
         }
-    }
-
-    private fun applyCloudTypeface(view: View) {
-        if (view is TextView) {
-            val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-            val family = when (UiStore(this).cloudThemeStyle) {
-                1 -> "sans-serif-condensed"
-                2 -> "sans-serif-light"
-                3 -> "sans-serif"
-                0 -> "sans-serif-rounded"
-                else -> "sans-serif"
-            }
-            view.typeface = Typeface.create(family, style)
-        }
-        if (view is ViewGroup) repeat(view.childCount) { applyCloudTypeface(view.getChildAt(it)) }
     }
 
     private suspend fun loadPlansWithCache(): JSONObject {

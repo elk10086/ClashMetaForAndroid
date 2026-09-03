@@ -5,6 +5,9 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
+import android.widget.TextView
+import android.graphics.Typeface
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
@@ -46,10 +49,38 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
             field = value
             if (value != null) {
                 setContentView(value.root)
+                applySkinTypography(value.root)
             } else {
                 setContentView(View(this))
             }
         }
+
+    private fun applySkinTypography(view: View) {
+        val skin = uiStore.cloudThemeStyle
+        if (skin < 0) return
+        if (view is TextView) {
+            val weight = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
+            val family = when (skin) {
+                0 -> "sans-serif-rounded"
+                1 -> "sans-serif-condensed"
+                2 -> "sans-serif-light"
+                else -> "sans-serif"
+            }
+            view.typeface = Typeface.create(family, weight)
+            view.textScaleX = when (skin) {
+                1 -> .90f
+                2 -> 1.03f
+                else -> 1f
+            }
+            view.letterSpacing = when (skin) {
+                0 -> .015f
+                1 -> .025f
+                3 -> .035f
+                else -> 0f
+            }
+        }
+        if (view is ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
+    }
 
     private var defer: suspend () -> Unit = {}
     private var deferRunning = false

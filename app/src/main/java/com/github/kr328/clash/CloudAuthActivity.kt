@@ -68,7 +68,23 @@ class CloudAuthActivity : AppCompatActivity() {
         }
     }
 
-    private fun render() = setContentView(if (step == Step.LOGIN) loginPage() else flowPage())
+    private fun render() {
+        val page = if (step == Step.LOGIN) loginPage() else flowPage()
+        setContentView(page)
+        applySkinTypography(page)
+    }
+
+    private fun applySkinTypography(view: View) {
+        val skin = UiStore(this).cloudThemeStyle
+        if (skin < 0) return
+        if (view is TextView) {
+            val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
+            view.typeface = themeTypeface(style)
+            view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
+            view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
+        }
+        if (view is android.view.ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
+    }
 
     private fun loginPage(): View {
         val mail = input(getString(DesignR.string.cloud_auth_email), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
