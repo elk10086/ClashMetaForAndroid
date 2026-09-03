@@ -11,6 +11,8 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.github.kr328.clash.design.R as DesignR
 
 /** Activity-backed equivalent of hle_fi's persistent four-destination NavigationBar. */
@@ -25,7 +27,17 @@ object CloudBottomNavigation {
         host.addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(bar(activity, selected), LinearLayout.LayoutParams(-1, dp(activity, 80)))
+            val navigation = bar(activity, selected)
+            addView(navigation, LinearLayout.LayoutParams(-1, dp(activity, 80)))
+            ViewCompat.setOnApplyWindowInsetsListener(navigation) { view, insets ->
+                val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                view.setPadding(0, 0, 0, bottomInset)
+                view.layoutParams = view.layoutParams.apply {
+                    height = dp(activity, 80) + bottomInset
+                }
+                insets
+            }
+            ViewCompat.requestApplyInsets(navigation)
         }, FrameLayout.LayoutParams(-1, -1))
     }
 
