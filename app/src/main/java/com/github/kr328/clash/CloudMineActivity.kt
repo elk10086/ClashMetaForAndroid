@@ -6,6 +6,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.text.Html
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -21,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
+import com.github.kr328.clash.cloud.CloudSubscription
 import com.github.kr328.clash.cloud.CloudReleaseManager
 import com.github.kr328.clash.util.stopClashService
 import com.github.kr328.clash.util.withProfile
@@ -194,20 +196,48 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        title = mapOf("plans" to "会员中心", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "工单和客服")[type]
+        val pageTitle = mapOf("plans" to "会员中心", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "工单和客服")[type] ?: ""
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(24)) }
         content.setBackgroundColor(Color.parseColor("#FAFAFA"))
         loading = ProgressBar(this)
         content.addView(loading, LinearLayout.LayoutParams(-1, dp(48)))
-        setContentView(ScrollView(this).apply { addView(content) })
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#FAFAFA"))
+            addView(pageHeader(pageTitle), LinearLayout.LayoutParams(-1, dp(56)))
+            addView(ScrollView(this@CloudBusinessActivity).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
+        })
         reload()
+    }
+
+    private fun pageHeader(pageTitle: String): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(4), 0, dp(16), 0)
+        setBackgroundColor(Color.WHITE)
+        addView(ImageView(this@CloudBusinessActivity).apply {
+            setImageResource(R.drawable.cloud_back)
+            setColorFilter(Color.parseColor("#212121"))
+            contentDescription = "返回"
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(13), dp(13), dp(13), dp(13))
+            setOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        addView(TextView(this@CloudBusinessActivity).apply {
+            text = pageTitle
+            textSize = 18f
+            setTextColor(Color.parseColor("#212121"))
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+        }, LinearLayout.LayoutParams(0, -1, 1f))
     }
 
     private fun reload() = lifecycleScope.launch {
         loading.visibility = View.VISIBLE
         try {
             when (type) {
-                "plans" -> renderPlans(api.plans())
+                "plans" -> renderPlans(api.plans(), runCatching { api.subscription() }.getOrNull())
                 "orders" -> renderOrders(api.orders())
                 "invite" -> renderInvite(api.inviteSummary(), api.inviteDetails(), api.userInfo())
                 "tickets" -> renderTickets(api.tickets())
@@ -217,9 +247,19 @@ class CloudBusinessActivity : AppCompatActivity() {
         } finally { loading.visibility = View.GONE }
     }
 
-    private fun renderPlans(json: JSONObject) {
-        addText("商店", 18f, "#212121")
-        addCard(CloudSession(this).email, "选择适合你的套餐，购买后订阅将自动更新") {}
+    private fun renderPlans(json: JSONObject, subscription: CloudSubscription?) {
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "商店"; textSize = 18f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD)
+            }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "↻  刷新"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.BLACK)
+                isClickable = true; isFocusable = true; setOnClickListener { recreate() }
+            }, LinearLayout.LayoutParams(dp(82), dp(44)))
+        })
+        content.addView(memberCard(subscription), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(20) })
         val list = json.optJSONArray("data") ?: JSONArray()
         if (list.length() == 0) return addText("暂无可购买套餐")
         repeat(list.length()) { i ->
@@ -227,12 +267,86 @@ class CloudBusinessActivity : AppCompatActivity() {
             val periods = listOf(
                 "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
                 "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付", "onetime_price" to "一次性",
-            ).filter { plan.optLong(it.first, 0) > 0 }
-            addCard(plan.optString("name", "套餐"), "${plan.optLong("transfer_enable")} GB · ${periods.joinToString(" / ") { it.second }}") {
-                if (periods.isNotEmpty()) choosePeriod(plan, periods)
-            }
+            ).filter { plan.optLong(it.first, 0) >= 1000 }
+            if (periods.isNotEmpty()) content.addView(planCard(plan, periods), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
     }
+
+    private fun memberCard(subscription: CloudSubscription?): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(15), dp(14), dp(15), dp(14))
+        background = roundedCard()
+        addView(LinearLayout(this@CloudBusinessActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            val account = subscription?.email?.ifBlank { CloudSession(this@CloudBusinessActivity).email }
+                ?: CloudSession(this@CloudBusinessActivity).email
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = maskBusinessEmail(account); textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD)
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "到期时间：${formatExpiry(subscription?.expiresAt ?: 0)}"; textSize = 11f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(3), 0, 0)
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "当前套餐：${subscription?.plan?.ifBlank { "未开通" } ?: "未开通"}"; textSize = 11f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(3), 0, 0)
+            })
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        addView(ImageView(this@CloudBusinessActivity).apply {
+            setImageResource(R.drawable.cloud_vip_flag); scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }, LinearLayout.LayoutParams(dp(63), dp(30)))
+    }
+
+    private fun planCard(plan: JSONObject, periods: List<Pair<String, String>>): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(14), dp(14), dp(14), dp(14))
+        background = roundedCard()
+        isClickable = true; isFocusable = true
+        setOnClickListener { choosePeriod(plan, periods) }
+        addView(LinearLayout(this@CloudBusinessActivity).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = plan.optString("name", "套餐"); textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 2
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            if (plan.optLong("onetime_price", 0) > 0) addView(TextView(this@CloudBusinessActivity).apply {
+                text = "限时返场"; textSize = 11f; setTextColor(Color.parseColor("#E67817")); gravity = Gravity.CENTER
+                setPadding(dp(8), dp(3), dp(8), dp(3)); background = rounded("#FFF3E8", 99, "#F2C28F")
+            })
+        })
+        val lowest = periods.map { plan.optLong(it.first) }.filter { it > 0 }.minOrNull() ?: 0
+        addView(TextView(this@CloudBusinessActivity).apply {
+            text = "低至 ￥${money(lowest)}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(8))
+        })
+        addView(LinearLayout(this@CloudBusinessActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            periods.take(3).forEach { period ->
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "${period.second} ￥${money(plan.optLong(period.first))}"; textSize = 12f; setTextColor(Color.parseColor("#212121")); gravity = Gravity.CENTER
+                    setPadding(dp(9), dp(5), dp(9), dp(5)); background = rounded("#EEEEEE", 99)
+                }, LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(8) })
+            }
+        })
+        val rights = parseRights(plan.optString("content"))
+        rights.take(3).forEach { right ->
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = right; textSize = 13f; setTextColor(Color.parseColor("#424242")); maxLines = 1; setPadding(0, dp(7), 0, 0)
+            })
+        }
+        if (rights.size > 3) addView(TextView(this@CloudBusinessActivity).apply {
+            text = "还有 ${rights.size - 3} 项权益，点击查看详情"; textSize = 12f; setTextColor(Color.BLACK); setPadding(0, dp(7), 0, 0)
+        })
+    }
+
+    @Suppress("DEPRECATION")
+    private fun parseRights(raw: String): List<String> = Html.fromHtml(raw.replace("<br>", "\n").replace("<br/>", "\n"))
+        .toString().lines().map { it.trim() }.filter { it.isNotBlank() }
+
+    private fun maskBusinessEmail(value: String): String {
+        val parts = value.split('@')
+        return if (parts.size == 2 && parts[0].length > 3) "${parts[0].take(3)}****${parts[1]}" else value
+    }
+
+    private fun formatExpiry(timestamp: Long): String = if (timestamp <= 0) "不限时长" else
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
 
     private fun choosePeriod(plan: JSONObject, periods: List<Pair<String, String>>) {
         AlertDialog.Builder(this).setTitle("选择购买周期")
@@ -385,6 +499,10 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
     private fun money(cents: Long) = String.format(java.util.Locale.US, "%.2f", cents / 100.0)
     private fun roundedCard() = GradientDrawable().apply { setColor(Color.WHITE); cornerRadius = dp(14).toFloat(); setStroke(dp(1), Color.parseColor("#E0E0E0")) }
+    private fun rounded(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
+        setColor(Color.parseColor(fill)); cornerRadius = dp(radius).toFloat()
+        stroke?.let { setStroke(dp(1), Color.parseColor(it)) }
+    }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun toast(e: Throwable) = Toast.makeText(this, e.message ?: "操作失败", Toast.LENGTH_LONG).show()
 }
