@@ -92,7 +92,7 @@ class CloudAuthActivity : AppCompatActivity() {
         val form = vertical().apply {
             layoutParams = lp(minOf(resources.displayMetrics.widthPixels - dp(56), dp(440)), -2)
             addView(TextView(this@CloudAuthActivity).apply {
-                text = getString(DesignR.string.cloud_brand); gravity = Gravity.CENTER; textSize = 32f
+                text = BuildConfig.BRAND_DISPLAY_NAME; gravity = Gravity.CENTER; textSize = 32f
                 typeface = Typeface.create("sans-serif-black", Typeface.BOLD); setTextColor(foreground()); letterSpacing = .08f
                 setOnClickListener {
                     val now = android.os.SystemClock.elapsedRealtime()
@@ -102,8 +102,8 @@ class CloudAuthActivity : AppCompatActivity() {
                     } else lastBrandTapAt = now
                 }
             })
-            addView(link(getString(DesignR.string.cloud_official_site), underline = true, bold = false) {
-                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://zhuiyun.one"))) }
+            addView(link("防失联：${BuildConfig.BRAND_OFFICIAL_SITE_HOST}", underline = true, bold = false) {
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.BRAND_OFFICIAL_SITE_URL))) }
                     .onFailure { toast(getString(DesignR.string.cloud_operation_failed)) }
             }, LinearLayout.LayoutParams(-2, dp(40)).apply { gravity = Gravity.CENTER_HORIZONTAL })
             addSpace(34); addView(mail); addSpace(18); addView(password); addSpace(40)
@@ -238,7 +238,7 @@ class CloudAuthActivity : AppCompatActivity() {
         setOnClickListener {
             lifecycleScope.launch {
                 val remote = runCatching { CloudReleaseManager.customerServiceUrl(this@CloudAuthActivity) }.getOrDefault("")
-                val url = remote.ifBlank { "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f" }
+                val url = remote.ifBlank { BuildConfig.BRAND_CUSTOMER_SERVICE_URL }
                 runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure { toast(getString(DesignR.string.cloud_operation_failed)) }
             }
         }

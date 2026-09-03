@@ -94,14 +94,14 @@ subprojects {
         }
 
         productFlavors {
-            flavorDimensions("feature")
+            if (isApp) flavorDimensions("brand", "feature") else flavorDimensions("feature")
 
             val removeSuffix = (queryConfigProperty("remove.suffix") as? String)?.toBoolean() == true
 
             create("alpha") {
                 isDefault = true
-                dimension = flavorDimensionList[0]
-                if (!removeSuffix) {
+                dimension = "feature"
+                if (!removeSuffix && !isApp) {
                     versionNameSuffix = ".Alpha"
                 }
 
@@ -111,15 +111,11 @@ subprojects {
                 resValue("string", "launch_name", "@string/launch_name_alpha")
                 resValue("string", "application_name", "@string/application_name_alpha")
 
-                if (isApp && !removeSuffix) {
-                    applicationIdSuffix = ".alpha"
-                }
             }
 
             create("meta") {
-
-                dimension = flavorDimensionList[0]
-                if (!removeSuffix) {
+                dimension = "feature"
+                if (!removeSuffix && !isApp) {
                     versionNameSuffix = ".Meta"
                 }
 
@@ -128,8 +124,57 @@ subprojects {
                 resValue("string", "launch_name", "@string/launch_name_meta")
                 resValue("string", "application_name", "@string/application_name_meta")
 
-                if (isApp && !removeSuffix) {
-                    applicationIdSuffix = ".meta"
+            }
+
+            if (isApp) {
+                fun com.android.build.gradle.internal.dsl.ProductFlavor.brandConfig(
+                    id: String,
+                    displayName: String,
+                    appId: String,
+                    brandVersionName: String,
+                    brandVersionCode: Int,
+                    officialSiteUrl: String,
+                    officialSiteHost: String,
+                    customerServiceUrl: String,
+                    configUrls: String,
+                ) {
+                    dimension = "brand"
+                    applicationId = appId
+                    versionName = brandVersionName
+                    versionCode = brandVersionCode
+                    resValue("string", "launch_name", displayName)
+                    resValue("string", "application_name", displayName)
+                    buildConfigField("String", "BRAND_ID", "\"$id\"")
+                    buildConfigField("String", "BRAND_DISPLAY_NAME", "\"$displayName\"")
+                    buildConfigField("String", "BRAND_OFFICIAL_SITE_URL", "\"$officialSiteUrl\"")
+                    buildConfigField("String", "BRAND_OFFICIAL_SITE_HOST", "\"$officialSiteHost\"")
+                    buildConfigField("String", "BRAND_CUSTOMER_SERVICE_URL", "\"$customerServiceUrl\"")
+                    buildConfigField("String", "BRAND_CONFIG_URLS", "\"$configUrls\"")
+                }
+
+                create("zy") {
+                    brandConfig(
+                        "zy", "ZY", "com.flutterfly.zhuiyun", "6.6.3", 2026080401,
+                        "https://www.zhuiyunjiasu.xyz", "www.zhuiyunjiasu.xyz",
+                        "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f",
+                        "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/zy_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/zy_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/zy_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/zy_checkVersion.txt",
+                    )
+                }
+                create("fly") {
+                    brandConfig(
+                        "fastfly", "Fastfly", "com.flutterfly.fastfly", "2.6.3", 2026074301,
+                        "https://fastfly.club", "fastfly.club",
+                        "https://go.crisp.chat/chat/embed/?website_id=36c7c66a-f768-4354-9823-5aaefec60c81",
+                        "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/fly_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/fly_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/fly_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/fly_checkVersion.txt",
+                    )
+                }
+                create("carx") {
+                    brandConfig(
+                        "carx", "CarX", "com.zz.car", "1.0.0", 2026050200,
+                        "https://carx.one", "carx.one",
+                        "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f",
+                        "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/car_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/car_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/car_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/zy_checkVersion.txt",
+                    )
                 }
             }
         }

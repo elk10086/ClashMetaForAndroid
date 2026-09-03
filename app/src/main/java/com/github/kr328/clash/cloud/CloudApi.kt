@@ -2,6 +2,7 @@ package com.github.kr328.clash.cloud
 
 import android.content.Context
 import android.util.Base64
+import com.github.kr328.clash.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -81,7 +82,7 @@ class CloudApi(private val context: Context) {
     suspend fun userInfo(): JSONObject = authenticatedGet("/api/v1/user/info")
 
     suspend fun remoteConfig(): JSONObject = withContext(Dispatchers.IO) {
-        CONFIG_URLS.mapNotNull { url -> runCatching { readConfigDocument(url) }.getOrNull() }
+        configUrls.mapNotNull { url -> runCatching { readConfigDocument(url) }.getOrNull() }
             .firstOrNull { it.optJSONObject("data") != null }
             ?: throw CloudException("远端配置不可用")
     }
@@ -168,7 +169,7 @@ class CloudApi(private val context: Context) {
     }
 
     private suspend fun loadRemoteConfig(): List<String> = coroutineScope {
-        CONFIG_URLS.map { url -> async(Dispatchers.IO) { runCatching { readConfig(url) }.getOrNull() } }
+        configUrls.map { url -> async(Dispatchers.IO) { runCatching { readConfig(url) }.getOrNull() } }
             .awaitAll().filterNotNull().firstOrNull { it.isNotEmpty() }.orEmpty()
     }
 
@@ -202,14 +203,8 @@ class CloudApi(private val context: Context) {
     private fun messageOf(json: JSONObject, fallback: String) = json.optString("message").ifBlank { fallback }
     private fun encode(value: String) = URLEncoder.encode(value, "UTF-8")
 
-    companion object {
-        private val CONFIG_URLS = listOf(
-            "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/zy_checkVersion.txt",
-            "https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/zy_checkVersion.txt",
-            "https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/zy_checkVersion.txt",
-            "https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/zy_checkVersion.txt",
-        )
-    }
+    private val configUrls: List<String>
+        get() = BuildConfig.BRAND_CONFIG_URLS.split('|').filter { it.startsWith("https://") }
 }
 
 class CloudException(message: String) : Exception(message)
