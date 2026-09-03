@@ -133,7 +133,15 @@ class CloudAuthActivity : AppCompatActivity() {
 
     private fun flowPage(): View {
         val content = vertical().apply { setPadding(dp(18), dp(20), dp(18), dp(36)) }
-        content.addView(ImageView(this).apply { setImageResource(R.drawable.cloud_back); setPadding(dp(14), dp(14), dp(14), dp(14)); setOnClickListener { onBackPressed() } }, lp(dp(48), dp(48)))
+        content.addView(ImageView(this).apply {
+            setImageResource(R.drawable.cloud_back)
+            setColorFilter(foreground())
+            contentDescription = getString(android.R.string.cancel)
+            isClickable = true
+            isFocusable = true
+            setPadding(dp(13), dp(13), dp(13), dp(13))
+            setOnClickListener { onBackPressed() }
+        }, lp(dp(48), dp(48)))
         content.addSpace(25)
         when (step) {
             Step.REGISTER_EMAIL, Step.RESET_EMAIL -> emailStep(content)
