@@ -34,14 +34,27 @@ object CloudBottomNavigation {
 
     fun create(activity: Activity, selected: Tab): View = bar(activity, selected).also { navigation ->
         ViewCompat.setOnApplyWindowInsetsListener(navigation) { view, insets ->
-            val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            // The design root consumes system-bar insets before nested views receive them.
+            // Read the unconsumed window insets from the decor view so the navigation bar
+            // remains above both three-button navigation and the gesture handle.
+            val windowInsets = ViewCompat.getRootWindowInsets(activity.window.decorView) ?: insets
+            val bottomInset = maxOf(
+                windowInsets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom,
+                windowInsets.getInsets(WindowInsetsCompat.Type.mandatorySystemGestures()).bottom,
+            )
             view.setPadding(0, 0, 0, bottomInset)
             view.layoutParams = view.layoutParams.apply {
                 height = dp(activity, 80) + bottomInset
             }
             insets
         }
-        ViewCompat.requestApplyInsets(navigation)
+        navigation.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) {
+                ViewCompat.requestApplyInsets(view)
+            }
+
+            override fun onViewDetachedFromWindow(view: View) = Unit
+        })
     }
 
     fun open(activity: Activity, tab: Tab) {
