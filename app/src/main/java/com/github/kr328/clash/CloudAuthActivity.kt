@@ -206,7 +206,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun input(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
         this.hint = hint; inputType = type; textSize = 16f; setTextColor(foreground()); setHintTextColor(secondary())
         isSingleLine = true; typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-        background = rounded(surface(), 16, blend(outline(), backgroundColor(), .65f)); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58)); elevation = dp(5).toFloat()
+        background = rounded(surface(), 16, outline()); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58))
     }
 
     private fun flowInput(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
