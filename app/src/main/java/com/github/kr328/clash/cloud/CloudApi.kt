@@ -73,6 +73,10 @@ class CloudApi(private val context: Context) {
     }
 
     suspend fun plans(): JSONObject = authenticatedGet("/api/v1/user/plan/fetch")
+    suspend fun planDetails(id: String): JSONObject = authenticatedGet(
+        "/api/v1/user/plan/fetch",
+        mapOf("id" to id),
+    )
     suspend fun orders(): JSONObject = authenticatedGet("/api/v1/user/order/fetch")
     suspend fun orderDetails(tradeNo: String): JSONObject = authenticatedGet(
         "/api/v1/user/order/detail",
@@ -86,6 +90,10 @@ class CloudApi(private val context: Context) {
     suspend fun inviteSummary(): JSONObject = authenticatedGet("/api/v1/user/invite/fetch")
     suspend fun inviteDetails(): JSONObject = authenticatedGet("/api/v1/user/invite/details")
     suspend fun createInviteCode(): JSONObject = authenticatedGet("/api/v1/user/invite/save")
+    suspend fun transferCommission(amount: Long): JSONObject = authenticatedPost(
+        "/api/v1/user/transfer",
+        mapOf("transfer_amount" to amount.toString()),
+    )
     suspend fun tickets(): JSONObject = authenticatedGet("/api/v1/user/ticket/fetch")
     suspend fun ticketDetails(id: String): JSONObject = authenticatedGet(
         "/api/v1/user/ticket/fetch",

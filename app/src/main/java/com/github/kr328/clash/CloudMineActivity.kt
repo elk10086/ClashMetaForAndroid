@@ -1,6 +1,9 @@
 package com.github.kr328.clash
 
 import android.content.Intent
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -9,7 +12,6 @@ import android.os.Bundle
 import android.text.Html
 import android.view.Gravity
 import android.view.View
-import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ImageView
@@ -40,6 +42,7 @@ class CloudMineActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         title = getString(DesignR.string.cloud_nav_mine)
         val root = vertical().apply {
+            setBackgroundColor(Color.parseColor("#FAFAFA"))
             setPadding(dp(18), dp(35), dp(18), dp(24))
             addView(LinearLayout(this@CloudMineActivity).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -52,15 +55,12 @@ class CloudMineActivity : AppCompatActivity() {
                 }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
             })
             addView(vipBanner())
-            addView(actionRow("我的订单") { open("orders") })
-            addView(actionRow("邀请返利") { open("invite") })
-            addView(actionRow("工单") { open("tickets") })
-            addView(actionRow("公告") {
-                lifecycleScope.launch { runCatching { CloudReleaseManager.showAnnouncement(this@CloudMineActivity) }.onFailure { toast(it) } }
-            })
             addView(actionRow("检查更新", emphasized = true) {
                 lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
             })
+            addView(actionRow("我的订单") { open("orders") })
+            addView(actionRow("邀请返利") { open("invite") })
+            addView(actionRow("意见反馈") { open("tickets") })
             addView(actionRow("线上客服", customer = true) {
                 lifecycleScope.launch {
                     runCatching { CloudReleaseManager.customerServiceUrl(this@CloudMineActivity) }
@@ -76,6 +76,7 @@ class CloudMineActivity : AppCompatActivity() {
             addView(logoutButton())
         }
         setContentView(vertical().apply {
+            setBackgroundColor(Color.parseColor("#FAFAFA"))
             addView(ScrollView(this@CloudMineActivity).apply { addView(root) }, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(
                 CloudBottomNavigation.create(this@CloudMineActivity, CloudBottomNavigation.Tab.MINE),
@@ -216,7 +217,7 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val pageTitle = mapOf("plans" to "会员中心", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "工单和客服")[type] ?: ""
+        val pageTitle = mapOf("plans" to "会员中心", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单")[type] ?: ""
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(24)) }
         content.setBackgroundColor(Color.parseColor("#FAFAFA"))
         loading = ProgressBar(this)
@@ -258,9 +259,12 @@ class CloudBusinessActivity : AppCompatActivity() {
         try {
             when (type) {
                 "plans" -> renderPlans(api.plans(), runCatching { api.subscription() }.getOrNull())
+                "plan_detail" -> renderPlanDetails(api.planDetails(intent.getStringExtra("plan_id").orEmpty()))
                 "orders" -> renderOrders(api.orders())
                 "invite" -> renderInvite(api.inviteSummary(), api.inviteDetails(), api.userInfo())
                 "tickets" -> renderTickets(api.tickets())
+                "ticket_detail" -> renderTicketConversation(api.ticketDetails(intent.getStringExtra("ticket_id").orEmpty()))
+                "ticket_create" -> renderTicketCreate()
             }
         } catch (e: Throwable) {
             addText(e.message ?: "加载失败", 14f, "#B00020")
@@ -321,7 +325,7 @@ class CloudBusinessActivity : AppCompatActivity() {
         setPadding(dp(14), dp(14), dp(14), dp(14))
         background = roundedCard()
         isClickable = true; isFocusable = true
-        setOnClickListener { choosePeriod(plan, periods) }
+        setOnClickListener { openPlanDetails(plan.optString("id")) }
         addView(LinearLayout(this@CloudBusinessActivity).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP
             addView(TextView(this@CloudBusinessActivity).apply {
@@ -356,6 +360,80 @@ class CloudBusinessActivity : AppCompatActivity() {
         })
     }
 
+    private fun openPlanDetails(planId: String) {
+        startActivity(Intent(this, CloudBusinessActivity::class.java).putExtra("type", "plan_detail").putExtra("plan_id", planId))
+    }
+
+    private fun renderPlanDetails(response: JSONObject) {
+        val raw = response.opt("data")
+        val plan = when (raw) {
+            is JSONObject -> raw
+            is JSONArray -> raw.optJSONObject(0)
+            else -> null
+        } ?: return addText("商品详情加载失败", 14f, "#B00020")
+        val periods = listOf(
+            "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
+            "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付", "onetime_price" to "一次性",
+        ).filter { plan.optLong(it.first) > 0 }
+        if (periods.isEmpty()) return addText("该商品暂无可购买周期")
+
+        var selected = periods.first()
+        var discount = 0L
+        val coupon = EditText(this).apply { hint = "请输入优惠码"; isSingleLine = true; background = rounded("#F5F5F5", 12) }
+        val amount = TextView(this).apply { textSize = 16f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD) }
+        fun updateAmount() {
+            val original = plan.optLong(selected.first)
+            val payable = (original - discount).coerceAtLeast(0)
+            amount.text = if (discount > 0) "原价 ¥${money(original)}   应付 ¥${money(payable)}" else "应付金额：¥${money(payable)}"
+        }
+
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)); background = roundedCard()
+            addView(TextView(this@CloudBusinessActivity).apply { text = plan.optString("name", "套餐"); textSize = 18f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD) })
+            addView(TextView(this@CloudBusinessActivity).apply { text = "低至 ¥${money(periods.minOf { plan.optLong(it.first) })}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setPadding(0, dp(7), 0, dp(10)) })
+            parseRights(plan.optString("content")).forEach { right -> addView(TextView(this@CloudBusinessActivity).apply { text = right; textSize = 14f; setTextColor(Color.parseColor("#424242")); setPadding(0, dp(4), 0, dp(4)) }) }
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+
+        content.addView(TextView(this).apply { text = "选择周期"; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(8), 0, dp(10)) })
+        val chips = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun redrawChips() {
+            chips.removeAllViews()
+            periods.forEach { period ->
+                chips.addView(TextView(this).apply {
+                    text = "${period.second}    ¥${money(plan.optLong(period.first))}"; textSize = 14f; gravity = Gravity.CENTER_VERTICAL
+                    setTextColor(Color.parseColor("#212121")); setPadding(dp(14), 0, dp(14), 0)
+                    background = rounded(if (period == selected) "#E8E8E8" else "#FFFFFF", 12, if (period == selected) "#212121" else "#E0E0E0")
+                    isClickable = true; setOnClickListener { selected = period; discount = 0; redrawChips(); updateAmount() }
+                }, LinearLayout.LayoutParams(-1, dp(48)).apply { bottomMargin = dp(8) })
+            }
+        }
+        redrawChips(); content.addView(chips)
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(8))
+            addView(coupon, LinearLayout.LayoutParams(0, dp(48), 1f))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "验证"; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 12); isClickable = true
+                setOnClickListener { lifecycleScope.launch {
+                    runCatching { api.checkCoupon(coupon.text.toString().trim(), plan.optString("id")) }.onSuccess { result ->
+                        val data = result.optJSONObject("data")
+                        val value = data?.optLong("value") ?: 0
+                        discount = if (data?.optInt("type") == 2) plan.optLong(selected.first) * value / 100 else value
+                        if (result.isNull("data") || result.opt("data") == false) toast(IllegalStateException(result.optString("message", "优惠码无效"))) else { updateAmount(); Toast.makeText(this@CloudBusinessActivity, "优惠码可用", Toast.LENGTH_SHORT).show() }
+                    }.onFailure { toast(it) }
+                } }
+            }, LinearLayout.LayoutParams(dp(76), dp(48)).apply { marginStart = dp(10) })
+        })
+        updateAmount()
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(12), dp(14), dp(12)); background = roundedCard()
+            addView(amount, LinearLayout.LayoutParams(0, dp(48), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "立即购买"; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 18); isClickable = true
+                setOnClickListener { lifecycleScope.launch { createAndPay(plan.optString("id"), selected.first, coupon.text.toString().trim()) } }
+            }, LinearLayout.LayoutParams(dp(108), dp(42)))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
+    }
+
     @Suppress("DEPRECATION")
     private fun parseRights(raw: String): List<String> = Html.fromHtml(raw.replace("<br>", "\n").replace("<br/>", "\n"))
         .toString().lines().map { it.trim() }.filter { it.isNotBlank() }
@@ -367,34 +445,6 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun formatExpiry(timestamp: Long): String = if (timestamp <= 0) "不限时长" else
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
-
-    private fun choosePeriod(plan: JSONObject, periods: List<Pair<String, String>>) {
-        AlertDialog.Builder(this).setTitle("选择购买周期")
-            .setItems(periods.map { "${it.second}  ¥${money(plan.optLong(it.first))}" }.toTypedArray()) { _, which ->
-                askCoupon(plan.optString("id"), periods[which].first)
-            }.show()
-    }
-
-    private fun askCoupon(planId: String, period: String) {
-        val input = EditText(this).apply { hint = "优惠码（选填）"; isSingleLine = true }
-        AlertDialog.Builder(this).setTitle("确认订单").setView(input)
-            .setNegativeButton("取消", null)
-            .setNeutralButton("无优惠码") { _, _ -> lifecycleScope.launch { createAndPay(planId, period, "") } }
-            .setPositiveButton("继续") { _, _ ->
-                lifecycleScope.launch {
-                    val coupon = input.text.toString().trim()
-                    if (coupon.isNotEmpty()) {
-                        val result = runCatching { api.checkCoupon(coupon, planId) }
-                        if (result.isFailure) return@launch toast(result.exceptionOrNull()!!)
-                        val response = result.getOrThrow()
-                        if (response.isNull("data") || response.opt("data") == false) {
-                            return@launch toast(IllegalStateException(response.optString("message", "优惠码无效")))
-                        }
-                    }
-                    createAndPay(planId, period, coupon)
-                }
-            }.show()
-    }
 
     private suspend fun createAndPay(planId: String, period: String, coupon: String) {
         try {
@@ -424,22 +474,36 @@ class CloudBusinessActivity : AppCompatActivity() {
             val order = list.optJSONObject(i) ?: return@repeat
             val plan = order.optJSONObject("plan")
             val status = when (order.optInt("status")) { 0 -> "待支付"; 1 -> "已支付"; 2 -> "已取消"; else -> "已完成" }
-            addCard(plan?.optString("name") ?: "订单", "订单号：${order.optString("trade_no")}\n$status · ¥${money(order.optLong("total_amount"))}") {
-                if (order.optInt("status") == 0) orderActions(order.optString("trade_no"))
-                else showOrderDetails(order.optString("trade_no"))
-            }
+            val tradeNo = order.optString("trade_no")
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(12)); background = roundedCard()
+                isClickable = true; setOnClickListener { showOrderDetails(tradeNo) }
+                addView(LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(this@CloudBusinessActivity).apply { text = plan?.optString("name") ?: "订单"; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
+                    addView(TextView(this@CloudBusinessActivity).apply { text = status; textSize = 12f; gravity = Gravity.CENTER; setPadding(dp(10), dp(4), dp(10), dp(4)); setTextColor(Color.parseColor(if (order.optInt("status") == 0) "#B45309" else "#616161")); background = rounded(if (order.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99) })
+                })
+                fun line(label: String, value: String) = TextView(this@CloudBusinessActivity).apply { text = "$label：$value"; textSize = 13f; setTextColor(Color.parseColor("#616161")); setPadding(0, dp(5), 0, 0) }
+                addView(line("订单号", tradeNo))
+                addView(line("下单时间", formatTimestamp(order.optLong("updated_at", order.optLong("created_at")))))
+                addView(line("订单金额", "¥${money(order.optLong("total_amount") + order.optLong("discount_amount"))}"))
+                if (order.optLong("discount_amount") > 0) addView(line("优惠金额", "-¥${money(order.optLong("discount_amount"))}"))
+                if (order.optLong("surplus_amount") > 0) addView(line("旧订阅折抵", "-¥${money(order.optLong("surplus_amount"))}"))
+                addView(TextView(this@CloudBusinessActivity).apply { text = "支付金额：¥${money(order.optLong("total_amount"))}"; textSize = 14f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(8), 0, 0) })
+                if (order.optInt("status") == 0) addView(LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.END; setPadding(0, dp(12), 0, 0)
+                    addView(actionButton("取消", false) { confirmCancel(tradeNo) })
+                    addView(actionButton("付款", true) { lifecycleScope.launch { payExisting(tradeNo) } }, LinearLayout.LayoutParams(dp(100), dp(38)).apply { marginStart = dp(14) })
+                })
+            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
     }
 
-    private fun orderActions(tradeNo: String) {
-        AlertDialog.Builder(this).setTitle("待支付订单")
-            .setItems(arrayOf("查看详情", "继续支付", "取消订单")) { _, which ->
-                when (which) {
-                    0 -> showOrderDetails(tradeNo)
-                    1 -> lifecycleScope.launch { payExisting(tradeNo) }
-                    else -> confirmCancel(tradeNo)
-                }
-            }.show()
+    private fun actionButton(label: String, primary: Boolean, click: () -> Unit) = TextView(this).apply {
+        text = label; gravity = Gravity.CENTER; textSize = 14f; isClickable = true; setOnClickListener { click() }
+        setTextColor(Color.parseColor(if (primary) "#FFFFFF" else "#424242"))
+        background = rounded(if (primary) "#212121" else "#FFFFFF", 19, if (primary) null else "#9E9E9E")
+        layoutParams = LinearLayout.LayoutParams(dp(100), dp(38))
     }
 
     private fun showOrderDetails(tradeNo: String) = lifecycleScope.launch {
@@ -495,13 +559,25 @@ class CloudBusinessActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(0, dp(76), 1f))
         }
         content.addView(statRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10); bottomMargin = dp(20) })
+        val commission = user?.optLong("commission_balance", 0) ?: 0
+        if (commission > 0) content.addView(actionButton("提现到余额", true) { confirmCommissionTransfer(commission) }, LinearLayout.LayoutParams(dp(120), dp(40)).apply { gravity = Gravity.END; bottomMargin = dp(18) })
         addText("我的邀请码", 16f, "#212121")
         val codes = data?.optJSONArray("codes") ?: data?.optJSONArray("code")
-        addCard("邀请码", codes?.toString() ?: "尚未生成") {
-            lifecycleScope.launch { try { api.createInviteCode(); recreate() } catch (e: Throwable) { toast(e) } }
-        }
+        val inviteCode = data?.optString("invite_code").orEmpty().ifBlank { codes?.optJSONObject(0)?.optString("code").orEmpty() }
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(10)); background = roundedCard()
+            addView(TextView(this@CloudBusinessActivity).apply { text = inviteCode.ifBlank { "尚未生成" }; textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            addView(actionButton(if (inviteCode.isBlank()) "生成邀请码" else "复制邀请码", true) {
+                if (inviteCode.isBlank()) lifecycleScope.launch { runCatching { api.createInviteCode() }.onSuccess { recreate() }.onFailure { toast(it) } }
+                else {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("邀请码", inviteCode))
+                    Toast.makeText(this@CloudBusinessActivity, "邀请码已复制", Toast.LENGTH_SHORT).show()
+                }
+            }, LinearLayout.LayoutParams(dp(112), dp(40)))
+        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(20) })
         val users = details.optJSONArray("data") ?: JSONArray()
-        addText("已邀请 ${users.length()} 人", 15f, "#212121")
+        addText("邀请返佣明细 · 共 ${users.length()} 笔", 15f, "#212121")
         repeat(users.length()) { index ->
             val invited = users.optJSONObject(index) ?: return@repeat
             addCard(
@@ -511,57 +587,99 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
     }
 
+    private fun confirmCommissionTransfer(amount: Long) {
+        AlertDialog.Builder(this).setTitle("提现到余额").setMessage("确认将可提现佣金 ¥${money(amount)} 转入账户余额？")
+            .setNegativeButton("取消", null).setPositiveButton("确认提现") { _, _ ->
+                lifecycleScope.launch { runCatching { api.transferCommission(amount) }.onSuccess { Toast.makeText(this@CloudBusinessActivity, "提现成功", Toast.LENGTH_SHORT).show(); recreate() }.onFailure { toast(it) } }
+            }.show()
+    }
+
     private fun renderTickets(json: JSONObject) {
-        val create = Button(this).apply { text = "创建工单"; setOnClickListener { createTicketDialog() } }
-        content.addView(create)
+        content.addView(TextView(this).apply {
+            text = "+ 创建工单"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 18); isClickable = true
+            setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_create")) }
+        }, LinearLayout.LayoutParams(dp(130), dp(42)).apply { gravity = Gravity.END; bottomMargin = dp(14) })
         val list = json.optJSONArray("data") ?: JSONArray()
         if (list.length() == 0) return addText("暂无工单")
         repeat(list.length()) { i ->
             val item = list.optJSONObject(i) ?: return@repeat
-            addCard(item.optString("subject", "工单"), "${item.optString("message")}\n状态：${if (item.optInt("status") == 0) "处理中" else "已关闭"}") {
-                showTicketDetails(item.optString("id"), item.optInt("status") == 0)
+            val level = when (item.optInt("level")) { 0 -> "低"; 2 -> "高"; else -> "中" }
+            val state = if (item.optInt("status") == 0) "处理中" else "已关闭"
+            addCard(item.optString("subject", "工单 #${item.optString("id")}"), "$level · $state\n${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}") {
+                startActivity(Intent(this, CloudBusinessActivity::class.java).putExtra("type", "ticket_detail").putExtra("ticket_id", item.optString("id")))
             }
         }
     }
 
-    private fun showTicketDetails(id: String, open: Boolean) = lifecycleScope.launch {
-        runCatching { api.ticketDetails(id) }.onSuccess { response ->
-            val data = response.optJSONObject("data") ?: response
-            val messages = data.optJSONArray("message") ?: data.optJSONArray("messages") ?: JSONArray()
-            val history = buildString {
-                append(data.optString("subject", "工单详情"))
-                repeat(messages.length()) { index ->
-                    val message = messages.optJSONObject(index) ?: return@repeat
-                    append("\n\n${message.optString("message")}")
-                    message.optString("created_at").takeIf { it.isNotBlank() }?.let { append("\n$it") }
-                }
-            }
-            val builder = AlertDialog.Builder(this@CloudBusinessActivity).setTitle("工单详情").setMessage(history).setNegativeButton("关闭", null)
-            if (open) builder.setPositiveButton("操作") { _, _ -> ticketActions(id) }
-            builder.show()
-        }.onFailure { toast(it) }
+    private fun renderTicketConversation(response: JSONObject) {
+        val ticket = response.optJSONObject("data") ?: return addText("工单详情加载失败", 14f, "#B00020")
+        val closed = ticket.optInt("status") == 1
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@CloudBusinessActivity).apply { text = ticket.optString("subject", "工单详情"); textSize = 16f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            if (!closed) addView(actionButton("关闭工单", false) { confirmCloseTicket(ticket.optString("id")) }, LinearLayout.LayoutParams(dp(100), dp(38)))
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        val messages = ticket.optJSONArray("message") ?: JSONArray()
+        if (messages.length() == 0) addText("暂无消息")
+        repeat(messages.length()) { index ->
+            val message = messages.optJSONObject(index) ?: return@repeat
+            val mine = message.optBoolean("is_me")
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(10), dp(12), dp(8)); background = rounded(if (mine) "#E5E5E5" else "#FFFFFF", 12, "#E0E0E0")
+                addView(TextView(this@CloudBusinessActivity).apply { text = message.optString("message"); textSize = 14f; setTextColor(Color.parseColor("#212121")) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = formatTimestamp(message.optLong("created_at")); textSize = 11f; setTextColor(Color.parseColor("#757575")); setPadding(0, dp(5), 0, 0) })
+            }, LinearLayout.LayoutParams((resources.displayMetrics.widthPixels * 0.78f).toInt(), -2).apply { gravity = if (mine) Gravity.END else Gravity.START; bottomMargin = dp(10) })
+        }
+        if (!closed) {
+            val reply = EditText(this).apply { hint = "请输入回复内容"; minLines = 1; maxLines = 4; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(8), dp(12), dp(8)) }
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.BOTTOM; setPadding(0, dp(8), 0, dp(8))
+                addView(reply, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "发送"; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded("#212121", 20); isClickable = true
+                    setOnClickListener { val value = reply.text.toString().trim(); if (value.isNotEmpty()) lifecycleScope.launch { runCatching { api.replyTicket(ticket.optString("id"), value) }.onSuccess { recreate() }.onFailure { toast(it) } } }
+                }, LinearLayout.LayoutParams(dp(72), dp(42)).apply { marginStart = dp(8) })
+            })
+        }
     }
 
-    private fun ticketActions(id: String) {
-        AlertDialog.Builder(this).setTitle("工单操作").setItems(arrayOf("回复工单", "关闭工单")) { _, which ->
-            if (which == 0) {
-                val input = EditText(this).apply { hint = "回复内容"; minLines = 3 }
-                AlertDialog.Builder(this).setTitle("回复工单").setView(input).setNegativeButton("取消", null).setPositiveButton("发送") { _, _ ->
-                    lifecycleScope.launch { try { api.replyTicket(id, input.text.toString()); recreate() } catch (e: Throwable) { toast(e) } }
-                }.show()
-            } else {
-                lifecycleScope.launch { try { api.closeTicket(id); recreate() } catch (e: Throwable) { toast(e) } }
-            }
+    private fun confirmCloseTicket(id: String) {
+        AlertDialog.Builder(this).setTitle("关闭工单").setMessage("关闭后将无法继续回复，确定关闭？").setNegativeButton("取消", null).setPositiveButton("关闭") { _, _ ->
+            lifecycleScope.launch { runCatching { api.closeTicket(id) }.onSuccess { recreate() }.onFailure { toast(it) } }
         }.show()
     }
 
-    private fun createTicketDialog() {
-        val subject = EditText(this).apply { hint = "工单主题" }
-        val message = EditText(this).apply { hint = "问题描述"; minLines = 3 }
-        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), 0, dp(20), 0); addView(subject); addView(message) }
-        AlertDialog.Builder(this).setTitle("创建工单").setView(box).setNegativeButton("取消", null).setPositiveButton("提交") { _, _ ->
-            lifecycleScope.launch { try { api.createTicket(subject.text.toString(), 1, message.text.toString()); recreate() } catch (e: Throwable) { toast(e) } }
-        }.show()
+    private fun renderTicketCreate() {
+        val subject = EditText(this).apply { hint = "请输入工单主题"; isSingleLine = true; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), 0, dp(12), 0) }
+        val message = EditText(this).apply { hint = "请详细描述遇到的问题"; minLines = 6; gravity = Gravity.TOP; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(12), dp(12), dp(12)) }
+        var level = 1
+        val levels = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        fun redraw() {
+            levels.removeAllViews()
+            listOf("低", "中", "高").forEachIndexed { index, label ->
+                levels.addView(TextView(this).apply {
+                    text = label; gravity = Gravity.CENTER; textSize = 14f; isClickable = true; setTextColor(Color.parseColor("#212121"))
+                    background = rounded(if (level == index) "#E5E5E5" else "#FFFFFF", 12, if (level == index) "#212121" else "#D5D5D5")
+                    setOnClickListener { level = index; redraw() }
+                }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { if (index > 0) marginStart = dp(8) })
+            }
+        }
+        fun label(value: String) = TextView(this).apply { text = value; textSize = 15f; setTextColor(Color.parseColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(14), 0, dp(8)) }
+        content.addView(label("主题")); content.addView(subject, LinearLayout.LayoutParams(-1, dp(50)))
+        content.addView(label("优先级")); redraw(); content.addView(levels)
+        content.addView(label("问题描述")); content.addView(message, LinearLayout.LayoutParams(-1, -2))
+        content.addView(TextView(this).apply {
+            text = "提交工单"; gravity = Gravity.CENTER; textSize = 15f; setTextColor(Color.WHITE); background = rounded("#212121", 22); isClickable = true
+            setOnClickListener {
+                val title = subject.text.toString().trim(); val body = message.text.toString().trim()
+                if (title.isBlank() || body.isBlank()) toast(IllegalArgumentException("请填写完整的主题和问题描述"))
+                else lifecycleScope.launch { runCatching { api.createTicket(title, level, body) }.onSuccess {
+                    Toast.makeText(this@CloudBusinessActivity, "工单已提交", Toast.LENGTH_SHORT).show()
+                    startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "tickets").addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP))
+                    finish()
+                }.onFailure { toast(it) } }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(22) })
     }
 
     private fun addCard(title: String, subtitle: String, click: () -> Unit) {
