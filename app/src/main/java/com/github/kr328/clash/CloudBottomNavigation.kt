@@ -37,7 +37,11 @@ object CloudBottomNavigation {
             Tab.MINE -> CloudMineActivity::class.java
         }
         if (activity.javaClass == target) return
-        activity.startActivity(Intent(activity, target).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        activity.startActivity(
+            Intent(activity, target).addFlags(
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
+            ),
+        )
         @Suppress("DEPRECATION")
         activity.overridePendingTransition(0, 0)
     }

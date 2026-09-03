@@ -66,6 +66,9 @@ class MainActivity : BaseActivity<MainDesign>() {
         val design = MainDesign(this)
 
         setContentDesign(design)
+        withContext(Dispatchers.Main) {
+            CloudBottomNavigation.attach(this@MainActivity, CloudBottomNavigation.Tab.DASHBOARD)
+        }
 
         design.fetch()
         launch { detectNetwork(design) }

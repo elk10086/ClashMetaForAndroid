@@ -74,8 +74,8 @@ class CloudMineActivity : AppCompatActivity() {
         }
         setContentView(vertical().apply {
             addView(ScrollView(this@CloudMineActivity).apply { addView(root) }, LinearLayout.LayoutParams(-1, 0, 1f))
-            addView(bottomNavigation(), LinearLayout.LayoutParams(-1, dp(80)))
         })
+        CloudBottomNavigation.attach(this, CloudBottomNavigation.Tab.MINE)
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
                 val text = if (subscription.expiresAt > 0) {
@@ -134,39 +134,6 @@ class CloudMineActivity : AppCompatActivity() {
             startActivity(login)
             finish()
         }
-    }
-
-    private fun bottomNavigation(): View = LinearLayout(this).apply {
-        orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-        setBackgroundColor(Color.parseColor("#F3F3F3"))
-        addView(navItem("仪表盘", DesignR.drawable.cloud_nav_dashboard, false) { openPrimary(MainActivity::class.java) })
-        addView(navItem("线路", DesignR.drawable.cloud_nav_lines, false) { openPrimary(ProxyActivity::class.java) })
-        addView(navItem("配置", DesignR.drawable.cloud_nav_profiles, false) { openPrimary(ProfilesActivity::class.java) })
-        addView(navItem("我的", DesignR.drawable.cloud_nav_mine_selected, true) {})
-    }
-
-    private fun navItem(label: String, icon: Int, selected: Boolean, click: () -> Unit): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; isClickable = true; isFocusable = true
-        setOnClickListener { click() }
-        addView(ImageView(this@CloudMineActivity).apply {
-            setImageResource(icon)
-            if (selected) setBackgroundResource(DesignR.drawable.cloud_nav_indicator)
-            setPadding(dp(20), dp(4), dp(20), dp(4))
-        }, LinearLayout.LayoutParams(dp(64), dp(32)))
-        addView(TextView(this@CloudMineActivity).apply {
-            text = label; textSize = 12f; gravity = Gravity.CENTER; setTextColor(Color.parseColor(if (selected) "#212121" else "#8B91A2")); if (selected) setTypeface(typeface, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(-1, dp(24)))
-    }.also { it.layoutParams = LinearLayout.LayoutParams(0, -1, 1f) }
-
-    private fun openPrimary(target: Class<*>) {
-        if (target == CloudMineActivity::class.java) return
-        val flags = if (target == MainActivity::class.java) {
-            Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        } else {
-            Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-        }
-        startActivity(Intent(this, target).addFlags(flags))
-        overridePendingTransition(0, 0)
     }
 
     private fun vipBanner(): View = LinearLayout(this).apply {
