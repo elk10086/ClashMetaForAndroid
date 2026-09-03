@@ -76,8 +76,11 @@ class CloudMineActivity : AppCompatActivity() {
         }
         setContentView(vertical().apply {
             addView(ScrollView(this@CloudMineActivity).apply { addView(root) }, LinearLayout.LayoutParams(-1, 0, 1f))
+            addView(
+                CloudBottomNavigation.create(this@CloudMineActivity, CloudBottomNavigation.Tab.MINE),
+                LinearLayout.LayoutParams(-1, dp(80)),
+            )
         })
-        CloudBottomNavigation.attach(this, CloudBottomNavigation.Tab.MINE)
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
                 val text = if (subscription.expiresAt > 0) {

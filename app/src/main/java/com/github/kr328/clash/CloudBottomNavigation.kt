@@ -27,18 +27,21 @@ object CloudBottomNavigation {
         host.addView(LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             addView(page, LinearLayout.LayoutParams(-1, 0, 1f))
-            val navigation = bar(activity, selected)
+            val navigation = create(activity, selected)
             addView(navigation, LinearLayout.LayoutParams(-1, dp(activity, 80)))
-            ViewCompat.setOnApplyWindowInsetsListener(navigation) { view, insets ->
-                val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                view.setPadding(0, 0, 0, bottomInset)
-                view.layoutParams = view.layoutParams.apply {
-                    height = dp(activity, 80) + bottomInset
-                }
-                insets
-            }
-            ViewCompat.requestApplyInsets(navigation)
         }, FrameLayout.LayoutParams(-1, -1))
+    }
+
+    fun create(activity: Activity, selected: Tab): View = bar(activity, selected).also { navigation ->
+        ViewCompat.setOnApplyWindowInsetsListener(navigation) { view, insets ->
+            val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            view.setPadding(0, 0, 0, bottomInset)
+            view.layoutParams = view.layoutParams.apply {
+                height = dp(activity, 80) + bottomInset
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(navigation)
     }
 
     fun open(activity: Activity, tab: Tab) {
