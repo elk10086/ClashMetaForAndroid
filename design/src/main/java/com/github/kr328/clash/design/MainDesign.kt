@@ -41,7 +41,6 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         .inflate(context.layoutInflater, context.root, false)
     private var selectedMode: TunnelState.Mode = TunnelState.Mode.Rule
     private var powerPulseAnimator: AnimatorSet? = null
-    private var lastConnectionTimeSeconds: Long? = null
 
     override val root: View
         get() = binding.root
@@ -125,46 +124,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
     }
 
     suspend fun setConnectionTime(value: String) = withContext(Dispatchers.Main) {
-        val nextSeconds = value.toConnectionTimeSeconds()
-        val animateTick = nextSeconds != null && lastConnectionTimeSeconds?.plus(1L) == nextSeconds
-        lastConnectionTimeSeconds = nextSeconds
-
-        val timeView = binding.connectionTimeView
-        timeView.animate().cancel()
-        if (!animateTick || !timeView.isAttachedToWindow) {
-            timeView.alpha = 1f
-            timeView.translationY = 0f
-            binding.connectionTime = value
-            return@withContext
-        }
-
-        val offset = 3f * context.resources.displayMetrics.density
-        timeView.animate()
-            .alpha(0.35f)
-            .translationY(-offset)
-            .setDuration(90L)
-            .setInterpolator(AccelerateDecelerateInterpolator())
-            .withEndAction {
-                binding.connectionTime = value
-                binding.executePendingBindings()
-                timeView.translationY = offset
-                timeView.animate()
-                    .alpha(1f)
-                    .translationY(0f)
-                    .setDuration(160L)
-                    .setInterpolator(AccelerateDecelerateInterpolator())
-                    .start()
-            }
-            .start()
-    }
-
-    private fun String.toConnectionTimeSeconds(): Long? {
-        val parts = split(':')
-        if (parts.size != 3) return null
-        val hours = parts[0].toLongOrNull() ?: return null
-        val minutes = parts[1].toLongOrNull() ?: return null
-        val seconds = parts[2].toLongOrNull() ?: return null
-        return hours * 3_600L + minutes * 60L + seconds
+        binding.connectionTime = value
     }
 
     suspend fun setCloudAccount(plan: String, expiry: String, usage: String, progress: Int) {
