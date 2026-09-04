@@ -24,18 +24,18 @@ type ageKeyPair struct {
 }
 
 //export fetchAndValid
-func fetchAndValid(callback unsafe.Pointer, path, url C.c_string, force C.int) {
-	go func(path, url string, callback unsafe.Pointer) {
+func fetchAndValid(callback unsafe.Pointer, path, url, userAgent C.c_string, force C.int) {
+	go func(path, url, userAgent string, callback unsafe.Pointer) {
 		cb := &remoteValidCallback{callback: callback}
 
-		err := config.FetchAndValid(path, url, force != 0, cb.reportStatus)
+		err := config.FetchAndValid(path, url, userAgent, force != 0, cb.reportStatus)
 
 		C.fetch_complete(callback, marshalString(err))
 
 		C.release_object(callback)
 
 		runtime.GC()
-	}(C.GoString(path), C.GoString(url), callback)
+	}(C.GoString(path), C.GoString(url), C.GoString(userAgent), callback)
 }
 
 //export load

@@ -32,6 +32,7 @@ object Bridge {
         completable: FetchCallback,
         path: String,
         url: String,
+        userAgent: String,
         force: Boolean
     )
 

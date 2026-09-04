@@ -24,7 +24,7 @@ import com.github.kr328.clash.util.withProfile
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudSubscription
-import com.github.kr328.clash.cloud.CloudUserAgent
+import com.github.kr328.clash.common.constants.ClientUserAgent
 import com.github.kr328.clash.cloud.CloudReleaseManager
 import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.PreviewService
@@ -435,7 +435,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                     connection.connectTimeout = 10_000
                     connection.readTimeout = 10_000
                     connection.setRequestProperty("Accept", "application/json")
-                    connection.setRequestProperty("User-Agent", CloudUserAgent.value)
+                    connection.setRequestProperty("User-Agent", ClientUserAgent.value(this@MainActivity))
                     try {
                         if (connection.responseCode != HttpURLConnection.HTTP_OK) return@runCatching null
                         val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })

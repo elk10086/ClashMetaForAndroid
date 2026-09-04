@@ -3,6 +3,7 @@ package com.github.kr328.clash.cloud
 import android.content.Context
 import android.util.Base64
 import com.github.kr328.clash.BuildConfig
+import com.github.kr328.clash.common.constants.ClientUserAgent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -169,7 +170,7 @@ class CloudApi(private val context: Context) {
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 15_000
                 connection.setRequestProperty("Accept", "application/json")
-                connection.setRequestProperty("User-Agent", CloudUserAgent.value)
+                connection.setRequestProperty("User-Agent", ClientUserAgent.value(context))
                 if (authenticated) connection.setRequestProperty("Authorization", session.authData)
                 val body = (if (connection.responseCode in 200..299) connection.inputStream else connection.errorStream)
                     ?.bufferedReader()?.use { it.readText() }.orEmpty()

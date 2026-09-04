@@ -38,8 +38,8 @@ type fetchHeader struct {
 	ProfileUpdateInterval string
 }
 
-func openUrl(ctx context.Context, url string) (io.ReadCloser, fetchHeader, error) {
-	response, err := clashHttp.HttpRequest(ctx, url, http.MethodGet, http.Header{"User-Agent": {"FreeMetaForAndroid/" + app.VersionName()}}, nil)
+func openUrl(ctx context.Context, url, userAgent string) (io.ReadCloser, fetchHeader, error) {
+	response, err := clashHttp.HttpRequest(ctx, url, http.MethodGet, http.Header{"User-Agent": {userAgent}}, nil)
 
 	if err != nil {
 		return nil, fetchHeader{}, err
@@ -55,7 +55,7 @@ func openContent(url string) (io.ReadCloser, error) {
 	return app.OpenContent(url)
 }
 
-func fetch(url *U.URL, file string) (fetchHeader, error) {
+func fetch(url *U.URL, file, userAgent string) (fetchHeader, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -65,7 +65,7 @@ func fetch(url *U.URL, file string) (fetchHeader, error) {
 
 	switch url.Scheme {
 	case "http", "https":
-		reader, header, err = openUrl(ctx, url.String())
+		reader, header, err = openUrl(ctx, url.String(), userAgent)
 	case "content":
 		reader, err = openContent(url.String())
 	default:
@@ -151,6 +151,7 @@ func reportSubscriptionInfo(header fetchHeader, reportStatus func(string)) {
 func FetchAndValid(
 	path string,
 	url string,
+	userAgent string,
 	force bool,
 	reportStatus func(string),
 ) error {
@@ -171,7 +172,7 @@ func FetchAndValid(
 
 		reportStatus(string(bytes))
 
-		header, err := fetch(url, configPath)
+		header, err := fetch(url, configPath, userAgent)
 		if err != nil {
 			return err
 		}
@@ -235,7 +236,7 @@ func FetchAndValid(
 			}
 		}
 
-		_, _ = fetch(url, ps)
+		_, _ = fetch(url, ps, userAgent)
 	})
 
 	bytes, _ := json.Marshal(&Status{
