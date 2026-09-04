@@ -120,13 +120,12 @@
                     <ProgressBar
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
-                        android:layout_height="4dp"
+                        android:layout_height="3dp"
                         android:layout_marginTop="8dp"
                         android:indeterminate="false"
                         android:max="100"
                         android:progress="@{cloudProgress}"
-                        android:progressTint="?attr/colorPrimary"
-                        android:progressBackgroundTint="?attr/colorControlHighlight" />
+                        android:progressDrawable="@drawable/cloud_usage_progress" />
                 </LinearLayout>
 
                 <ImageView

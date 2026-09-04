@@ -35,6 +35,8 @@ class ProxyView(
             reset()
 
             textSize = state.config.textSize
+            typeface = state.config.textTypeface
+            textScaleX = state.config.textScaleX
 
             getTextBounds("Stub!", 0, 1, state.rect)
         }
@@ -163,6 +165,8 @@ class ProxyView(
         paint.reset()
 
         paint.textSize = state.config.textSize
+        paint.typeface = state.config.textTypeface
+        paint.textScaleX = state.config.textScaleX
         paint.isAntiAlias = true
         paint.color = state.controls
 
