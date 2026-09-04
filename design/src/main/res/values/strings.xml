@@ -1,4 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="PluralsCandidate">
+    <string name="cloud_announcement">Announcement</string>
     <string name="launch_name_meta">ZY</string>
     <string name="launch_name_alpha">ZY</string>
     <string name="application_name_meta">ZY</string>

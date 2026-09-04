@@ -56,6 +56,7 @@ class MainActivity : BaseActivity<MainDesign>() {
     private var cloudSubscription: CloudSubscription? = null
     private var cloudSyncError: String? = null
     private var previewCoreRunning = false
+    private var announcementData: JSONObject? = null
 
     override suspend fun main() {
         if (!requireCloudLogin()) {
@@ -73,7 +74,15 @@ class MainActivity : BaseActivity<MainDesign>() {
         cloudSubscription = loadCachedCloudSubscription()
         design.fetch()
         if (cachedNetworkResult == null) requestNetworkDetection(design)
-        launch { runCatching { CloudReleaseManager.checkOnLaunch(this@MainActivity) } }
+        launch {
+            runCatching { CloudReleaseManager.checkOnLaunch(this@MainActivity) }.getOrNull()?.let { data ->
+                announcementData = data
+                design.setAnnouncement(
+                    data.optString("title").ifBlank { "公告" },
+                    CloudReleaseManager.isDashboardAnnouncementUnread(this@MainActivity, data),
+                )
+            }
+        }
         if (CloudSession(this).loggedIn) launch { refreshCloudSubscription(design) }
 
         val ticker = ticker(TimeUnit.SECONDS.toMillis(1))
@@ -137,6 +146,11 @@ class MainActivity : BaseActivity<MainDesign>() {
                             openPrimary(CloudMineActivity::class.java)
                         MainDesign.Request.OpenPlans ->
                             startActivity(Intent(this@MainActivity, CloudBusinessActivity::class.java).putExtra("type", "plans"))
+                        MainDesign.Request.OpenAnnouncement -> announcementData?.let { data ->
+                            CloudReleaseManager.showDashboardAnnouncement(this@MainActivity, data) {
+                                launch { design.setAnnouncement("", false) }
+                            }
+                        }
                         MainDesign.Request.DetectNetwork -> requestNetworkDetection(design)
                         MainDesign.Request.ChangeMode -> {
                             val mode = design.takeSelectedMode()

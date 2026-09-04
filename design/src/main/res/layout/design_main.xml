@@ -15,7 +15,10 @@
         <variable name="uploadSpeed" type="String" />
         <variable name="downloadSpeed" type="String" />
         <variable name="connectionTime" type="String" />
+        <variable name="announcementTitle" type="String" />
+        <variable name="announcementVisible" type="boolean" />
         <import type="com.github.kr328.clash.design.MainDesign.Request" />
+        <import type="android.view.View" />
     </data>
 
     <LinearLayout
@@ -72,6 +75,48 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="18dp"
                 android:paddingTop="16dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="12dp"
+                    android:background="@drawable/cloud_announcement_strip"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:onClick="@{() -> self.request(Request.OpenAnnouncement)}"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="14dp"
+                    android:paddingVertical="12dp"
+                    android:visibility="@{announcementVisible ? View.VISIBLE : View.GONE}">
+
+                    <ImageView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:contentDescription="@string/cloud_announcement"
+                        android:src="@drawable/ic_cloud_announcement"
+                        android:tint="?attr/colorPrimary" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:text="@{announcementTitle}"
+                        android:textColor="?attr/colorControlNormal"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:gravity="center"
+                        android:text="›"
+                        android:textColor="?attr/colorControlNormal"
+                        android:textSize="22sp" />
+                </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"

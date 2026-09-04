@@ -44,6 +44,8 @@ class CloudAuthActivity : AppCompatActivity() {
     private var resetting = false
     private var busy = false
     private var lastBrandTapAt = 0L
+    private var announcementData: org.json.JSONObject? = null
+    private var announcementEntry: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applySelectedTheme()
@@ -52,7 +54,14 @@ class CloudAuthActivity : AppCompatActivity() {
         window.statusBarColor = backgroundColor()
         window.navigationBarColor = backgroundColor()
         render()
-        lifecycleScope.launch { runCatching { CloudReleaseManager.showAnnouncement(this@CloudAuthActivity, automatic = true) } }
+        lifecycleScope.launch {
+            runCatching { CloudReleaseManager.announcementData(this@CloudAuthActivity) }.getOrNull()?.let { data ->
+                announcementData = data
+                val hasContent = data.optString("title").isNotBlank() || data.optString("content").isNotBlank() || data.optString("img_url").isNotBlank()
+                announcementEntry?.visibility = if (data.optInt("show", 0) == 1 && hasContent) View.VISIBLE else View.GONE
+                if (step == Step.LOGIN) CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, data, automatic = true)
+            }
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -240,6 +249,29 @@ class CloudAuthActivity : AppCompatActivity() {
         setBackgroundColor(backgroundColor())
         addView(FrameLayout(this@CloudAuthActivity).apply {
             addView(ScrollView(this@CloudAuthActivity).apply { isFillViewport = true; addView(content) }, FrameLayout.LayoutParams(-1, -1))
+            if (footer) {
+                announcementEntry = TextView(this@CloudAuthActivity).apply {
+                    text = "公告"
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setTextColor(foreground())
+                    setTypeface(typeface, Typeface.BOLD)
+                    setCompoundDrawablesWithIntrinsicBounds(DesignR.drawable.ic_cloud_announcement, 0, 0, 0)
+                    compoundDrawablePadding = dp(4)
+                    setPadding(dp(8), 0, dp(8), 0)
+                    isClickable = true
+                    isFocusable = true
+                    visibility = if (announcementData?.optInt("show", 0) == 1) View.VISIBLE else View.GONE
+                    setOnClickListener { announcementData?.let { CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, it) } }
+                }
+                addView(announcementEntry, FrameLayout.LayoutParams(-2, dp(44), Gravity.TOP or Gravity.END).apply {
+                    topMargin = dp(8)
+                    marginEnd = dp(8)
+                })
+            } else {
+                announcementEntry = null
+            }
             if (footer) addView(serviceButton(), FrameLayout.LayoutParams(dp(56), dp(56), Gravity.END or Gravity.BOTTOM).apply {
                 marginEnd = dp(16); bottomMargin = dp(16)
             })
