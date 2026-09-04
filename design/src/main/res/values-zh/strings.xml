@@ -159,6 +159,7 @@
     <string name="doubles">双列</string>
     <string name="multiple">多列</string>
     <string name="not_selectable">不可选择</string>
+    <string name="cloud_proxy_group_not_selectable_tips">当前栏使用自动选择或故障转移策略，无法手动切换线路，请选择可手动选择的线路栏。</string>
     <string name="providers">外部资源</string>
     <string name="unavailable">不可用</string>
     <string name="_new">新建</string>

@@ -116,9 +116,17 @@ class ProxyDesign(
                     surface,
                     config,
                     List(groupNames.size) { index ->
-                        ProxyAdapter(config) { name ->
-                            requests.trySend(Request.Select(index, name))
-                        }
+                        ProxyAdapter(
+                            config = config,
+                            clicked = { name -> requests.trySend(Request.Select(index, name)) },
+                            notSelectableClicked = {
+                                Toast.makeText(
+                                    context,
+                                    R.string.cloud_proxy_group_not_selectable_tips,
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                            },
+                        )
                     }
                 ) {
                     if (it == currentItem)
