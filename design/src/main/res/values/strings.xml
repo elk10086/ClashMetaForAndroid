@@ -438,4 +438,6 @@
     <string name="cloud_dashboard_detection_timeout">timeout</string>
     <string name="cloud_dashboard_speed">Network traffic</string>
     <string name="cloud_lines_connect_first">Start the connection to load lines</string>
+    <string name="cloud_lines_preparing">Preparing lines. They will open automatically</string>
+    <string name="cloud_lines_still_loading">Lines are still loading. Please try again shortly</string>
 </resources>

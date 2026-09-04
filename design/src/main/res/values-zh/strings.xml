@@ -347,4 +347,6 @@
     <string name="cloud_dashboard_detection_timeout">timeout</string>
     <string name="cloud_dashboard_speed">网络速度</string>
     <string name="cloud_lines_connect_first">请先启动连接，线路将在核心加载后显示</string>
+    <string name="cloud_lines_preparing">正在准备线路，完成后将自动打开</string>
+    <string name="cloud_lines_still_loading">线路仍在加载，请稍后再试</string>
 </resources>

@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.PersistableBundle
+import android.os.SystemClock
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.core.app.ActivityCompat
@@ -43,6 +44,7 @@ import java.net.URL
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import com.github.kr328.clash.core.Clash
@@ -53,6 +55,8 @@ class MainActivity : BaseActivity<MainDesign>() {
     private val membershipCache by lazy { getSharedPreferences("cloud_membership_cache", MODE_PRIVATE) }
     private val subscriptionMutex = Mutex()
     private var networkDetectionJob: Job? = null
+    private var proxyOpenJob: Job? = null
+    private var coreTransitionUntilMillis = 0L
     private var cloudSubscription: CloudSubscription? = null
     private var cloudSyncError: String? = null
     private var previewCoreRunning = false
@@ -130,6 +134,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                 design.requests.onReceive {
                     when (it) {
                         MainDesign.Request.ToggleStatus -> {
+                            coreTransitionUntilMillis = SystemClock.elapsedRealtime() + 5_000L
                             if (clashRunning) {
                                 clearConnectionClock()
                                 stopClashService()
@@ -140,10 +145,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                                 design.startClash()
                             }
                         }
-                        MainDesign.Request.OpenProxy -> {
-                            if (clashRunning || previewCoreRunning) openPrimary(ProxyActivity::class.java)
-                            else design.showToast(DesignR.string.cloud_lines_connect_first, ToastDuration.Long)
-                        }
+                        MainDesign.Request.OpenProxy -> requestOpenProxy(design)
                         MainDesign.Request.OpenProfiles ->
                             openPrimary(ProfilesActivity::class.java)
                         MainDesign.Request.OpenSettings ->
@@ -625,6 +627,38 @@ class MainActivity : BaseActivity<MainDesign>() {
     private fun openPrimary(target: Class<*>) {
         startActivity(Intent(this, target).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         overridePendingTransition(0, 0)
+    }
+
+    private suspend fun requestOpenProxy(design: MainDesign) {
+        val transitioning = SystemClock.elapsedRealtime() < coreTransitionUntilMillis
+        if (!transitioning) {
+            if (clashRunning || previewCoreRunning) openPrimary(ProxyActivity::class.java)
+            else design.showToast(DesignR.string.cloud_lines_connect_first, ToastDuration.Long)
+            return
+        }
+
+        if (proxyOpenJob?.isActive == true) return
+        design.showToast(DesignR.string.cloud_lines_preparing, ToastDuration.Short)
+        proxyOpenJob = launch {
+            val ready = withTimeoutOrNull(4_500L) {
+                // Let the previous core fully stop before checking, otherwise its stale
+                // proxy groups can briefly look ready during the handover.
+                delay(500L)
+                while (isActive) {
+                    val hasGroups = runCatching {
+                        withClash {
+                            queryProxyGroupNames(uiStore.proxyExcludeNotSelectable).isNotEmpty()
+                        }
+                    }.getOrDefault(false)
+                    if (hasGroups) return@withTimeoutOrNull true
+                    delay(150L)
+                }
+                false
+            } == true
+
+            if (ready) openPrimary(ProxyActivity::class.java)
+            else design.showToast(DesignR.string.cloud_lines_still_loading, ToastDuration.Long)
+        }
     }
 
     private companion object {
