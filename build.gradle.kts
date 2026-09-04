@@ -138,6 +138,7 @@ subprojects {
                     officialSiteUrl: String,
                     officialSiteHost: String,
                     customerServiceUrl: String,
+                    telegramUrl: String,
                     configUrls: String,
                 ) {
                     dimension = "brand"
@@ -152,6 +153,7 @@ subprojects {
                     buildConfigField("String", "BRAND_OFFICIAL_SITE_URL", "\"$officialSiteUrl\"")
                     buildConfigField("String", "BRAND_OFFICIAL_SITE_HOST", "\"$officialSiteHost\"")
                     buildConfigField("String", "BRAND_CUSTOMER_SERVICE_URL", "\"$customerServiceUrl\"")
+                    buildConfigField("String", "BRAND_TELEGRAM_URL", "\"$telegramUrl\"")
                     buildConfigField("String", "BRAND_CONFIG_URLS", "\"$configUrls\"")
                 }
 
@@ -160,6 +162,7 @@ subprojects {
                         "zy", "ZY", "com.flutterfly.zhuiyun", "6.6.3", 2026080401,
                         "https://www.zhuiyunjiasu.xyz", "www.zhuiyunjiasu.xyz",
                         "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f",
+                        "https://t.me/zhuiyunjiasu666",
                         "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/zy_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/zy_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/zy_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/zy_checkVersion.txt",
                     )
                 }
@@ -168,6 +171,7 @@ subprojects {
                         "fastfly", "Fastfly", "com.flutterfly.fastfly", "2.6.3", 2026074301,
                         "https://fastfly.club", "fastfly.club",
                         "https://go.crisp.chat/chat/embed/?website_id=36c7c66a-f768-4354-9823-5aaefec60c81",
+                        "https://t.me/fastflyclub",
                         "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/fly_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/fly_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/fly_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/fly_checkVersion.txt",
                     )
                 }
@@ -176,6 +180,7 @@ subprojects {
                         "carx", "CarX", "com.zz.car", "1.0.0", 2026050200,
                         "https://carx.one", "carx.one",
                         "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f",
+                        "https://t.me/zhuiyunjiasu666",
                         "https://zyxb.oss-cn-wuhan-lr.aliyuncs.com/car_checkVersion.txt|https://pub-d51a46c1ed05483887d9cbbc4ea8d40a.r2.dev/car_checkVersion.txt|https://raw.gitcode.com/lishiming123/zzzzzzzzzzzzzzzzyyyyyy/raw/main/car_checkVersion.txt|https://wudidefastyyds-1401942160.cos.ap-chengdu.myqcloud.com/zy_checkVersion.txt",
                     )
                 }

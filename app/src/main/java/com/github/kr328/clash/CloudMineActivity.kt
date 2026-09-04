@@ -195,6 +195,8 @@ class CloudMineActivity : AppCompatActivity() {
     private lateinit var expiryView: TextView
     private lateinit var balanceView: TextView
     private lateinit var accountView: TextView
+    private lateinit var planView: TextView
+    private var accountEmail = ""
     private var appliedThemeSignature = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -202,43 +204,43 @@ class CloudMineActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         appliedThemeSignature = themeSignature()
         title = getString(DesignR.string.cloud_nav_mine)
+        accountEmail = CloudSession(this).email
         val root = vertical().apply {
             setBackgroundColor(cloudColor("#FAFAFA"))
-            setPadding(dp(18), dp(35), dp(18), dp(24))
-            addView(LinearLayout(this@CloudMineActivity).apply {
-                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-                addView(ImageView(this@CloudMineActivity).apply {
-                    setImageResource(R.drawable.cloud_avatar); scaleType = ImageView.ScaleType.CENTER_CROP
-                }, LinearLayout.LayoutParams(dp(48), dp(48)))
-                accountView = TextView(this@CloudMineActivity).apply {
-                    text = ""
-                    textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL)
-                }
-                addView(accountView, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
-            })
-            addView(sectionTitle("会员信息"))
+            setPadding(0, dp(12), 0, dp(24))
             addView(vipBanner())
             addView(sectionTitle("账号与服务"))
-            addView(sectionCard(
-                actionRow("我的订单") { open("orders") },
-                actionRow("邀请返利") { open("invite") },
-                actionRow("意见反馈") { open("tickets") },
+            addView(sectionList(
+                actionRow("邀请返利", "首次邀请好友可获得20%返现金额，可以用来购买/续费套餐", DesignR.drawable.ic_baseline_work) { open("invite") },
+                actionRow("意见反馈", "提交问题并查看工单处理进度", DesignR.drawable.ic_baseline_help_center) { open("tickets") },
+                actionRow("我的订单", leadingIcon = DesignR.drawable.ic_baseline_assignment) { open("orders") },
+                actionRow("官网", leadingIcon = DesignR.drawable.ic_baseline_domain) { openOfficialSite() },
             ))
-            addView(sectionTitle("应用设置"))
-            addView(sectionCard(
-                actionRow("检查更新", leadingIcon = DesignR.drawable.ic_outline_update) {
+            addView(sectionTitle("设置"))
+            addView(sectionList(
+                actionRow("主题", leadingIcon = DesignR.drawable.ic_baseline_brightness_4) { startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java)) },
+                actionRow("一键换肤", leadingIcon = DesignR.drawable.ic_baseline_extension) { open("skin") },
+                actionRow("设置", leadingIcon = DesignR.drawable.ic_baseline_settings) { startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java)) },
+            ))
+            addView(sectionTitle("其他"))
+            addView(sectionList(
+                actionRow("Telegram频道", "获取服务通知和最新动态", DesignR.drawable.ic_baseline_publish) {
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.BRAND_TELEGRAM_URL))) }.onFailure { toast(it) }
+                },
+                actionRow("检查更新", "当前版本 v${BuildConfig.BRAND_VERSION_NAME}", DesignR.drawable.ic_outline_update) {
                     lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
                 },
-                actionRow("清除远端缓存") { confirmRefreshServiceConfig() },
-                actionRow("主题") { startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java)) },
-                actionRow("一键换肤") { open("skin") },
-                actionRow("设置") { startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java)) },
+                actionRow("清除远端缓存", leadingIcon = DesignR.drawable.ic_baseline_clear_all) { confirmRefreshServiceConfig() },
+                actionRow(getString(DesignR.string.cloud_logout), leadingIcon = DesignR.drawable.ic_baseline_key) { confirmLogout() },
             ))
-            addView(sectionTitle("账号安全"))
-            addView(logoutButton())
         }
         setContentView(vertical().apply {
             setBackgroundColor(cloudColor("#FAFAFA"))
+            fitsSystemWindows = true
+            addView(TextView(this@CloudMineActivity).apply {
+                text = getString(DesignR.string.cloud_nav_mine); textSize = 20f; setTypeface(typeface, Typeface.BOLD)
+                setTextColor(cloudColor("#212121")); gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, dp(16), 0)
+            }, LinearLayout.LayoutParams(-1, dp(56)))
             addView(ScrollView(this@CloudMineActivity).apply { addView(root) }, LinearLayout.LayoutParams(-1, 0, 1f))
             addView(
                 CloudBottomNavigation.create(this@CloudMineActivity, CloudBottomNavigation.Tab.MINE),
@@ -247,6 +249,7 @@ class CloudMineActivity : AppCompatActivity() {
         }.also { applyCloudTypography(it) })
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
+                accountEmail = subscription.email
                 accountView.text = maskEmail(subscription.email)
                 val text = if (subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()) {
                     "已过期"
@@ -256,6 +259,7 @@ class CloudMineActivity : AppCompatActivity() {
                 } else "不限时长"
                 expiryView.text = "到期时间：$text"
                 balanceView.text = "钱包余额：¥${formatBalance(subscription.balance)}"
+                planView.text = "当前套餐：${subscription.plan.ifBlank { "未开通" }}"
             }
         }
     }
@@ -270,6 +274,12 @@ class CloudMineActivity : AppCompatActivity() {
     private fun open(type: String) = startActivity(
         Intent(this, CloudBusinessActivity::class.java).putExtra("type", type),
     )
+
+    private fun openOfficialSite() = lifecycleScope.launch {
+        val url = runCatching { CloudReleaseManager.officialSiteUrl(this@CloudMineActivity) }
+            .getOrDefault(BuildConfig.BRAND_OFFICIAL_SITE_URL)
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }.onFailure { toast(it) }
+    }
 
     private fun logoutButton(): View = TextView(this).apply {
         text = getString(DesignR.string.cloud_logout)
@@ -336,50 +346,72 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun vipBanner(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(15), dp(12), dp(15), dp(12))
-        background = roundRect("#FFFFFF", 8, "#E0E0E0")
+        setPadding(dp(15), dp(15), dp(15), dp(15))
+        background = roundRect("#FFFFFF", 14, "#E0E0E0")
         isClickable = true; isFocusable = true; setOnClickListener { open("plans") }
         addView(vertical().apply {
-            addView(TextView(this@CloudMineActivity).apply { text = "VIP会员"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL) })
+            var revealed = false
+            accountView = TextView(this@CloudMineActivity).apply {
+                text = accountEmail.let(::maskEmail)
+                textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL)
+                maxLines = 1; ellipsize = TextUtils.TruncateAt.END
+            }
+            addView(LinearLayout(this@CloudMineActivity).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(accountView, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(ImageView(this@CloudMineActivity).apply {
+                    setImageResource(R.drawable.cloud_eye_opened); setColorFilter(cloudPrimaryColor()); scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    contentDescription = "显示完整邮箱"; isClickable = true; isFocusable = true
+                    setOnClickListener {
+                        revealed = !revealed
+                        accountView.text = if (revealed) accountEmail else maskEmail(accountEmail)
+                        setImageResource(if (revealed) R.drawable.cloud_eye_closed else R.drawable.cloud_eye_opened)
+                        setColorFilter(cloudPrimaryColor())
+                    }
+                }, LinearLayout.LayoutParams(dp(20), dp(20)).apply { marginStart = dp(4) })
+            })
             expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
             addView(expiryView)
-            balanceView = TextView(this@CloudMineActivity).apply { text = "钱包余额：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
+            planView = TextView(this@CloudMineActivity).apply { text = "当前套餐：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
+            addView(planView)
+            balanceView = TextView(this@CloudMineActivity).apply { text = "钱包余额：加载中…"; textSize = 11f; setTextColor(cloudPrimaryColor()); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(2), 0, 0) }
             addView(balanceView)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-    }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(78)) }
+        addView(ImageView(this@CloudMineActivity).apply {
+            setImageResource(R.drawable.cloud_vip_flag); scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }, LinearLayout.LayoutParams(dp(63), dp(30)).apply { marginStart = dp(8) })
+    }.also {
+        it.layoutParams = LinearLayout.LayoutParams(-1, dp(96)).apply {
+            marginStart = dp(16); marginEnd = dp(16); topMargin = dp(12); bottomMargin = dp(8)
+        }
+    }
 
     private fun sectionTitle(title: String) = TextView(this).apply {
         text = title
-        textSize = 13f
+        textSize = 14f
         setTextColor(cloudColor("#757575"))
         setTypeface(typeface, Typeface.BOLD)
         gravity = Gravity.CENTER_VERTICAL
     }.also {
-        it.layoutParams = LinearLayout.LayoutParams(-1, dp(36)).apply {
-            topMargin = dp(12)
-            marginStart = dp(12)
-        }
+        it.setPadding(dp(16), dp(24), dp(8), dp(8))
+        it.layoutParams = LinearLayout.LayoutParams(-1, dp(52))
     }
 
-    private fun sectionCard(vararg rows: View) = LinearLayout(this).apply {
+    private fun sectionList(vararg rows: View) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        background = roundRect("#FFFFFF", 10, "#E0E0E0")
         rows.forEachIndexed { index, row ->
             if (index > 0) addView(View(this@CloudMineActivity).apply {
                 setBackgroundColor(cloudColor("#E0E0E0"))
                 alpha = .72f
-            }, LinearLayout.LayoutParams(-1, dp(1)).apply {
-                marginStart = dp(12)
-                marginEnd = dp(12)
-            })
+            }, LinearLayout.LayoutParams(-1, dp(1)))
             addView(row)
         }
     }
 
-    private fun actionRow(title: String, leadingIcon: Int? = null, click: () -> Unit): View =
+    private fun actionRow(title: String, subtitle: String? = null, leadingIcon: Int, click: () -> Unit): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(8), 0)
+            setPadding(dp(16), 0, dp(16), 0)
             isClickable = true
             isFocusable = true
             setOnFocusChangeListener { view, focused ->
@@ -387,16 +419,20 @@ class CloudMineActivity : AppCompatActivity() {
                 foreground = if (focused) roundRect("#00000000", 12, "#212121") else null
             }
             setOnClickListener { click() }
-            if (leadingIcon != null) addView(ImageView(this@CloudMineActivity).apply {
-                setImageResource(leadingIcon); setColorFilter(cloudPrimaryColor()); setPadding(dp(8), dp(8), dp(8), dp(8))
-            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(2) })
-            addView(TextView(this@CloudMineActivity).apply {
-                text = title; textSize = 15f; setTextColor(cloudColor("#212121"))
-            }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(ImageView(this@CloudMineActivity).apply {
-                setImageResource(R.drawable.cloud_chevron_right); setColorFilter(cloudColor("#9E9E9E")); scaleType = ImageView.ScaleType.CENTER
-            }, LinearLayout.LayoutParams(dp(22), dp(52)))
-        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(52)) }
+                setImageResource(leadingIcon); setColorFilter(cloudColor("#616161")); setPadding(dp(12), dp(12), dp(12), dp(12))
+            }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginEnd = dp(8) })
+            addView(LinearLayout(this@CloudMineActivity).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@CloudMineActivity).apply {
+                    text = title; textSize = 15f; setTextColor(cloudColor("#212121"))
+                })
+                if (subtitle != null) addView(TextView(this@CloudMineActivity).apply {
+                    text = subtitle; textSize = 12f; setTextColor(cloudColor("#757575")); maxLines = 2; ellipsize = TextUtils.TruncateAt.END
+                    setPadding(0, dp(3), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(if (subtitle == null) 56 else 72)) }
 
     private fun formatBalance(cents: Long) = String.format(java.util.Locale.US, "%.2f", cents / 100.0)
 
