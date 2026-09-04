@@ -151,14 +151,6 @@ object CloudReleaseManager {
                 gravity = Gravity.CENTER_VERTICAL
             }
             header.addView(TextView(activity).apply {
-                text = "!"
-                gravity = Gravity.CENTER
-                textSize = 18f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(onPrimary)
-                background = rounded(primary, 18)
-            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) })
-            header.addView(TextView(activity).apply {
                 text = title.ifBlank { "公告" }
                 textSize = 19f
                 setTypeface(typeface, Typeface.BOLD)
