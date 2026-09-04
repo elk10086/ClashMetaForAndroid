@@ -332,7 +332,7 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun vipBanner(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(15), dp(15), dp(15), dp(15))
+        setPadding(dp(15), dp(12), dp(15), dp(12))
         background = roundRect("#FFFFFF", 8, "#E0E0E0")
         isClickable = true; isFocusable = true; setOnClickListener { open("plans") }
         addView(vertical().apply {
@@ -342,7 +342,7 @@ class CloudMineActivity : AppCompatActivity() {
             balanceView = TextView(this@CloudMineActivity).apply { text = "钱包余额：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
             addView(balanceView)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-    }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(88)).apply { bottomMargin = dp(2) } }
+    }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(78)) }
 
     private fun sectionTitle(title: String) = TextView(this).apply {
         text = title
@@ -351,9 +351,9 @@ class CloudMineActivity : AppCompatActivity() {
         setTypeface(typeface, Typeface.BOLD)
         gravity = Gravity.CENTER_VERTICAL
     }.also {
-        it.layoutParams = LinearLayout.LayoutParams(-1, dp(34)).apply {
-            topMargin = dp(10)
-            marginStart = dp(4)
+        it.layoutParams = LinearLayout.LayoutParams(-1, dp(36)).apply {
+            topMargin = dp(12)
+            marginStart = dp(12)
         }
     }
 
@@ -363,7 +363,11 @@ class CloudMineActivity : AppCompatActivity() {
         rows.forEachIndexed { index, row ->
             if (index > 0) addView(View(this@CloudMineActivity).apply {
                 setBackgroundColor(cloudColor("#E0E0E0"))
-            }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(12); marginEnd = dp(12) })
+                alpha = .72f
+            }, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                marginStart = dp(12)
+                marginEnd = dp(12)
+            })
             addView(row)
         }
     }
@@ -387,8 +391,8 @@ class CloudMineActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(ImageView(this@CloudMineActivity).apply {
                 setImageResource(R.drawable.cloud_chevron_right); setColorFilter(cloudColor("#9E9E9E")); scaleType = ImageView.ScaleType.CENTER
-            }, LinearLayout.LayoutParams(dp(22), dp(50)))
-        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(50)) }
+            }, LinearLayout.LayoutParams(dp(22), dp(52)))
+        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(52)) }
 
     private fun formatBalance(cents: Long) = String.format(java.util.Locale.US, "%.2f", cents / 100.0)
 

@@ -47,22 +47,6 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="36dp"
-                android:background="@drawable/cloud_dashboard_card"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center"
-                android:minWidth="72dp"
-                android:onClick="@{() -> self.request(Request.ToggleStatus)}"
-                android:paddingHorizontal="10dp"
-                android:text="@{clashRunning ? @string/cloud_connected : @string/cloud_disconnected}"
-                android:textColor="@{clashRunning ? 0xFF237A3B : 0xFFB3261E}"
-                android:textSize="12sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="36dp"
-                android:layout_marginStart="8dp"
                 android:clickable="true"
                 android:focusable="true"
                 android:gravity="center"
