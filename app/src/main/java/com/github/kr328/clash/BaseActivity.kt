@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import android.graphics.Typeface
+import android.util.TypedValue
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
@@ -78,6 +79,9 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
                 1 -> .025f
                 3 -> .035f
                 else -> 0f
+            }
+            if (uiStore.cloudTextScaleEnabled) {
+                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * uiStore.cloudTextScalePercent.coerceIn(80, 140) / 100f)
             }
         }
         if (view is ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }

@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
+import android.util.TypedValue
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.Gravity
@@ -83,6 +84,10 @@ class CloudAuthActivity : AppCompatActivity() {
             view.typeface = themeTypeface(style)
             view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
             view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
+            val store = UiStore(this)
+            if (store.cloudTextScaleEnabled) {
+                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
+            }
         }
         if (view is android.view.ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
     }

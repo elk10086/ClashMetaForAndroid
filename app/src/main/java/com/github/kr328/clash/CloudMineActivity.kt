@@ -14,12 +14,16 @@ import android.text.Html
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.util.TypedValue
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ImageView
 import android.widget.GridLayout
+import android.widget.HorizontalScrollView
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.SeekBar
+import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import android.webkit.WebView
@@ -164,6 +168,10 @@ private fun Context.applyCloudTypography(view: View) {
         view.typeface = Typeface.create(family, style)
         view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
         view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
+        val store = UiStore(this)
+        if (store.cloudTextScaleEnabled) {
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
+        }
     }
     if (view is ViewGroup) repeat(view.childCount) { applyCloudTypography(view.getChildAt(it)) }
 }
@@ -430,64 +438,151 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun renderSkin() {
         val store = UiStore(this)
-        val values = listOf(-1, 0, 1, 2, 3)
-        val names = listOf("原生主题", "极简风", "公主风", "男神风", "二次元")
-        val descriptions = listOf("保留原来的配色与字体", "日系圆润 · 清爽留白", "樱花粉 · 修长字体", "冰川蓝 · 轻盈字体", "黑金色 · 个性字体")
+        val styles = listOf(
+            Triple(0, "❀", "极简风"),
+            Triple(1, "✦", "公主风"),
+            Triple(2, "♂", "男神风"),
+            Triple(3, "★", "二次元"),
+        )
+        val styleNames = mapOf(-1 to "原生主题", 0 to "极简风", 1 to "公主风", 2 to "男神风", 3 to "二次元")
+        fun sectionTitle(icon: String, title: String, action: String? = null, onAction: (() -> Unit)? = null) {
+            content.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(2), dp(8), dp(2), dp(10))
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "$icon  $title"; textSize = 15f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#424242"))
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                if (action != null) addView(TextView(this@CloudBusinessActivity).apply {
+                    text = action; textSize = 13f; setTextColor(cloudPrimaryColor()); gravity = Gravity.CENTER
+                    setPadding(dp(12), dp(6), dp(12), dp(6)); isClickable = true; setOnClickListener { onAction?.invoke() }
+                })
+            })
+        }
+        fun selectStyle(value: Int) {
+            if (store.cloudThemeStyle == value) return
+            store.cloudThemeStyle = value
+            refreshAllThemedActivities()
+            recreate()
+        }
+        fun optionCard(label: String, icon: String, selected: Boolean, click: () -> Unit) = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(16), 0, dp(16), 0)
+            background = if (selected) GradientDrawable().apply {
+                setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat()
+            } else rounded("#FFFFFF", 12, "#E0E0E0")
+            isClickable = true; isFocusable = true; setOnClickListener { click() }
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = icon; textSize = 18f; setTextColor(if (selected) cloudSelectedTextColor() else cloudPrimaryColor())
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = label; textSize = 14f; setPadding(dp(8), 0, 0, 0)
+                setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#424242"))
+            })
+        }
+
+        sectionTitle("▣", "主题预览", if (store.cloudThemeStyle >= 0) "重置" else null) { selectStyle(-1) }
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(18), dp(18), dp(18))
-            background = roundedCard()
-            addView(TextView(this@CloudBusinessActivity).apply {
-                text = "当前皮肤"
-                textSize = 12f; setTextColor(cloudColor("#757575"))
-            })
-            addView(TextView(this@CloudBusinessActivity).apply {
-                text = names[values.indexOf(store.cloudThemeStyle).coerceAtLeast(0)]
-                textSize = 22f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudPrimaryColor()); setPadding(0, dp(6), 0, dp(4))
-            })
-            addView(TextView(this@CloudBusinessActivity).apply {
-                text = "选择皮肤后，应用内颜色与字体会立即同步更新"
-                textSize = 13f; setTextColor(cloudColor("#757575"))
-            })
-        }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6); bottomMargin = dp(18) })
-
-        names.indices.chunked(2).forEach { rowIndexes ->
-            content.addView(LinearLayout(this).apply {
+            setPadding(dp(14), dp(14), dp(14), dp(14)); background = roundedCard()
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                rowIndexes.forEach { index ->
-                    val selected = store.cloudThemeStyle == values[index]
-                    addView(LinearLayout(this@CloudBusinessActivity).apply {
-                        orientation = LinearLayout.VERTICAL
-                        gravity = Gravity.CENTER_VERTICAL
-                        setPadding(dp(14), dp(12), dp(14), dp(12))
-                        background = if (selected) GradientDrawable().apply {
-                            setColor(cloudSelectedContainerColor()); cornerRadius = dp(16).toFloat()
-                        } else rounded("#FFFFFF", 16, "#E0E0E0")
-                        isClickable = true; isFocusable = true
-                        setOnClickListener {
-                            if (!selected) {
-                                store.cloudThemeStyle = values[index]
-                                refreshAllThemedActivities()
-                                recreate()
-                            }
-                        }
-                        addView(TextView(this@CloudBusinessActivity).apply {
-                            text = (if (selected) "✓  " else "") + names[index]
-                            textSize = 16f; setTypeface(typeface, Typeface.BOLD)
-                            setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#212121"))
-                        })
-                        addView(TextView(this@CloudBusinessActivity).apply {
-                            text = descriptions[index]; textSize = 12f; setPadding(0, dp(7), 0, 0)
-                            setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#757575"))
-                            alpha = if (selected) .78f else 1f
-                        })
-                    }, LinearLayout.LayoutParams(0, dp(94), 1f).apply {
-                        if (index % 2 == 1) marginStart = dp(10)
-                    })
+                listOf(cloudPrimaryColor(), cloudSelectedContainerColor(), cloudColor("#E0E0E0"), cloudColor("#FFFFFF")).forEach { color ->
+                    addView(View(this@CloudBusinessActivity).apply {
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color); setStroke(dp(1), cloudColor("#E0E0E0")) }
+                    }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) })
                 }
-                if (rowIndexes.size == 1) addView(View(this@CloudBusinessActivity), LinearLayout.LayoutParams(0, dp(94), 1f).apply { marginStart = dp(10) })
-            }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
-        }
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                val mode = when (store.darkMode) { DarkMode.Auto -> "自动"; DarkMode.ForceLight -> "浅色"; DarkMode.ForceDark -> "深色" }
+                text = "$mode   ${styleNames[store.cloudThemeStyle]}   ${if (store.pureBlack) "纯黑" else "标准"}"
+                textSize = 12f; setTextColor(cloudSelectedTextColor()); setPadding(0, dp(10), 0, 0)
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "字体风格：${listOf("系统字体", "Zen Maru Gothic", "Barlow Condensed", "Raleway", "ZCOOL KuaiLe")[store.cloudThemeStyle + 1]}"
+                textSize = 14f; setTextColor(cloudPrimaryColor()); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(12), 0, dp(2))
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "The quick brown fox jumps over the lazy dog\n这是一段主题预览文本"
+                textSize = 14f; setTextColor(cloudColor("#757575"))
+            })
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(16) })
+
+        sectionTitle("☀", "主题模式")
+        content.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                listOf(Triple(DarkMode.Auto, "◉", "自动"), Triple(DarkMode.ForceLight, "☀", "浅色"), Triple(DarkMode.ForceDark, "☾", "深色")).forEachIndexed { index, item ->
+                    addView(optionCard(item.third, item.second, store.darkMode == item.first) {
+                        store.darkMode = item.first; refreshAllThemedActivities(); recreate()
+                    }, LinearLayout.LayoutParams(-2, dp(56)).apply { if (index > 0) marginStart = dp(16) })
+                }
+            })
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(16) })
+
+        sectionTitle("◉", "主题风格")
+        content.addView(HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                styles.forEachIndexed { index, item ->
+                    addView(optionCard(item.third, item.second, store.cloudThemeStyle == item.first) { selectStyle(item.first) },
+                        LinearLayout.LayoutParams(-2, dp(56)).apply { if (index > 0) marginStart = dp(16) })
+                }
+            })
+        }, LinearLayout.LayoutParams(-1, dp(56)).apply { bottomMargin = dp(18) })
+
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(8), dp(4), dp(8))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "◐"; textSize = 21f; setTextColor(cloudPrimaryColor())
+            }, LinearLayout.LayoutParams(dp(36), -2))
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@CloudBusinessActivity).apply { text = "纯黑模式"; textSize = 15f; setTextColor(cloudColor("#424242")) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = "深色模式下使用纯黑背景"; textSize = 12f; setTextColor(cloudColor("#757575")) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(Switch(this@CloudBusinessActivity).apply {
+                isChecked = store.pureBlack
+                setOnCheckedChangeListener { _, checked ->
+                    store.pureBlack = checked; refreshAllThemedActivities(); recreate()
+                }
+            })
+        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
+
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(4), dp(8), dp(4), dp(4))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "Aa"; textSize = 16f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudPrimaryColor())
+            }, LinearLayout.LayoutParams(dp(36), -2))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "文字缩放"; textSize = 15f; setTextColor(cloudColor("#424242"))
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+            addView(Switch(this@CloudBusinessActivity).apply {
+                isChecked = store.cloudTextScaleEnabled
+                setOnCheckedChangeListener { _, checked ->
+                    store.cloudTextScaleEnabled = checked; refreshAllThemedActivities(); recreate()
+                }
+            })
+        })
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(16), 0, dp(4), dp(8))
+            addView(SeekBar(this@CloudBusinessActivity).apply {
+                max = 60; progress = store.cloudTextScalePercent.coerceIn(80, 140) - 80
+                isEnabled = store.cloudTextScaleEnabled
+                setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                        if (fromUser) store.cloudTextScalePercent = progress + 80
+                    }
+                    override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+                    override fun onStopTrackingTouch(seekBar: SeekBar?) {
+                        refreshAllThemedActivities(); recreate()
+                    }
+                })
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "${store.cloudTextScalePercent.coerceIn(80, 140)}%"; textSize = 14f; gravity = Gravity.END; setTextColor(cloudColor("#424242"))
+            }, LinearLayout.LayoutParams(dp(58), -2))
+        })
     }
 
     private fun refreshAllThemedActivities() {

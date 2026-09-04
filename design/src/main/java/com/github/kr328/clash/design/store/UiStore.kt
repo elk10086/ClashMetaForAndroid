@@ -37,6 +37,16 @@ class UiStore(context: Context) {
         defaultValue = false,
     )
 
+    var cloudTextScaleEnabled: Boolean by store.boolean(
+        key = "cloud_text_scale_enabled",
+        defaultValue = false,
+    )
+
+    var cloudTextScalePercent: Int by store.int(
+        key = "cloud_text_scale_percent",
+        defaultValue = 100,
+    )
+
     var hideAppIcon: Boolean by store.boolean(
         key = "hide_app_icon",
         defaultValue = context.packageManager.getComponentEnabledSetting(context.mainActivityAlias)
