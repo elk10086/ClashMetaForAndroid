@@ -1340,13 +1340,30 @@ class CloudBusinessActivity : AppCompatActivity() {
         val statCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(10), dp(10), dp(10)); background = roundedCard()
         }
-        val statRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        val statRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isBaselineAligned = false
+        }
         listOf("邀请用户", "可提现佣金", "确认中佣金", "佣金比例").forEachIndexed { index, label ->
             val raw = when (index) { 1 -> commission.toDouble(); else -> if (index < stats.length()) stats.optDouble(index, 0.0) else 0.0 }
             statRow.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
-                addView(TextView(this@CloudBusinessActivity).apply { text = if (index == 3) "${raw.toInt()}%" else if (index == 0) raw.toInt().toString() else String.format(java.util.Locale.US, "%.2f", raw / 100.0); textSize = 14f; setTextColor(cloudColor("#212121")) })
-                addView(TextView(this@CloudBusinessActivity).apply { text = label; textSize = 14f; setTextColor(cloudColor("#212121")); setPadding(0, dp(4), 0, 0) })
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = if (index == 3) "${raw.toInt()}%" else if (index == 0) raw.toInt().toString() else String.format(java.util.Locale.US, "%.2f", raw / 100.0)
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setTextColor(cloudColor("#212121"))
+                }, LinearLayout.LayoutParams(-1, -2))
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = label
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    setTextColor(cloudColor("#212121"))
+                    setPadding(0, dp(6), 0, 0)
+                }, LinearLayout.LayoutParams(-1, -2))
             }, LinearLayout.LayoutParams(0, dp(76), 1f))
         }
         statCard.addView(statRow)
@@ -1364,7 +1381,14 @@ class CloudBusinessActivity : AppCompatActivity() {
         val inviteCode = data?.optString("invite_code").orEmpty().ifBlank { newestCode }
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(10)); background = roundedCard()
-            addView(TextView(this@CloudBusinessActivity).apply { text = inviteCode.ifBlank { "尚未生成" }; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = inviteCode.ifBlank { "尚未生成" }
+                textSize = 16f
+                gravity = Gravity.CENTER_VERTICAL
+                includeFontPadding = false
+                setTextColor(cloudColor("#212121"))
+                setTypeface(typeface, Typeface.BOLD)
+            }, LinearLayout.LayoutParams(0, dp(42), 1f))
             addView(actionButton(if (inviteCode.isBlank()) "生成邀请码" else "复制邀请码", true) {
                 if (inviteCode.isBlank()) lifecycleScope.launch { runCatching { api.createInviteCode() }.onSuccess { recreate() }.onFailure { toast(it) } }
                 else {
@@ -1380,8 +1404,9 @@ class CloudBusinessActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(14)); background = roundedCard()
             addView(LinearLayout(this@CloudBusinessActivity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                addView(TextView(this@CloudBusinessActivity).apply { text = "返佣记录"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#212121")) }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(TextView(this@CloudBusinessActivity).apply { text = "共 ${users.length()} 笔"; textSize = 12f; setTextColor(cloudColor("#757575")) })
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@CloudBusinessActivity).apply { text = "返佣记录"; textSize = 14f; includeFontPadding = false; gravity = Gravity.CENTER_VERTICAL; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#212121")) }, LinearLayout.LayoutParams(0, dp(24), 1f))
+                addView(TextView(this@CloudBusinessActivity).apply { text = "共 ${users.length()} 笔"; textSize = 12f; includeFontPadding = false; gravity = Gravity.CENTER_VERTICAL; setTextColor(cloudColor("#757575")) }, LinearLayout.LayoutParams(-2, dp(24)))
             })
         }
         if (users.length() == 0) records.addView(LinearLayout(this).apply {
@@ -1400,7 +1425,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                     addView(TextView(this@CloudBusinessActivity).apply { text = "返佣到账"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#212121")) })
                     addView(TextView(this@CloudBusinessActivity).apply { text = formatTimestamp(invited.optLong("created_at")); textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(3), 0, 0) })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(TextView(this@CloudBusinessActivity).apply { text = "+￥${money(invited.optLong("get_amount"))}"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(Color.parseColor("#2E9D57")) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = "+￥${money(invited.optLong("get_amount"))}"; textSize = 14f; includeFontPadding = false; gravity = Gravity.CENTER_VERTICAL; setTypeface(typeface, Typeface.BOLD); setTextColor(Color.parseColor("#2E9D57")) })
             }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
         }
         content.addView(records)
