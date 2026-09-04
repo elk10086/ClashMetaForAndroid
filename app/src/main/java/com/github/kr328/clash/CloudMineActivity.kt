@@ -113,6 +113,8 @@ private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeSty
     else -> resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
 }
 
+private fun Context.cloudSecondaryColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorSecondary)
+
 private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).cloudThemeStyle == 0 && !isCloudDark()) {
     Color.WHITE
 } else {
@@ -195,11 +197,11 @@ class CloudMineActivity : AppCompatActivity() {
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
                 addView(TextView(this@CloudMineActivity).apply {
                     text = maskEmail(CloudSession(this@CloudMineActivity).email)
-                    textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD)
+                    textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL)
                 }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
             })
             addView(vipBanner())
-            addView(actionRow("检查更新", emphasized = true) {
+            addView(actionRow("检查更新", emphasized = true, leadingIcon = DesignR.drawable.ic_outline_update) {
                 lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
             })
             addView(actionRow("我的订单") { open("orders") })
@@ -233,7 +235,9 @@ class CloudMineActivity : AppCompatActivity() {
         }.also { applyCloudTypography(it) })
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
-                val text = if (subscription.expiresAt > 0) {
+                val text = if (subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()) {
+                    "已过期"
+                } else if (subscription.expiresAt > 0) {
                     java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
                         .format(java.util.Date(subscription.expiresAt * 1000))
                 } else "不限时长"
@@ -258,7 +262,10 @@ class CloudMineActivity : AppCompatActivity() {
         textSize = 15f
         gravity = Gravity.CENTER
         setTextColor(cloudButtonTextColor())
-        background = GradientDrawable().apply { setColor(cloudPrimaryColor()); cornerRadius = dp(25).toFloat() }
+        background = GradientDrawable(
+            GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(cloudPrimaryColor(), cloudSecondaryColor()),
+        ).apply { cornerRadius = dp(25).toFloat() }
         setOnClickListener { confirmLogout() }
     }.also { it.layoutParams = LinearLayout.LayoutParams(dp(200), dp(50)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(12); bottomMargin = dp(20) } }
 
@@ -321,14 +328,14 @@ class CloudMineActivity : AppCompatActivity() {
         )).apply { cornerRadius = dp(8).toFloat() }
         isClickable = true; isFocusable = true; setOnClickListener { open("plans") }
         addView(vertical().apply {
-            addView(TextView(this@CloudMineActivity).apply { text = "VIP会员"; textSize = 16f; setTextColor(Color.WHITE); setTypeface(typeface, Typeface.BOLD) })
-            expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(Color.WHITE); setPadding(0, dp(2), 0, 0) }
+            addView(TextView(this@CloudMineActivity).apply { text = "VIP会员"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL) })
+            expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(cloudColor("#212121")); setPadding(0, dp(2), 0, 0) }
             addView(expiryView)
         }, LinearLayout.LayoutParams(0, -2, 1f))
         addView(ImageView(this@CloudMineActivity).apply { setImageResource(R.drawable.cloud_vip_mark); scaleType = ImageView.ScaleType.CENTER_INSIDE }, LinearLayout.LayoutParams(dp(82), dp(40)))
     }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(77)).apply { topMargin = dp(17); bottomMargin = dp(20) } }
 
-    private fun actionRow(title: String, emphasized: Boolean = false, customer: Boolean = false, click: () -> Unit): View =
+    private fun actionRow(title: String, emphasized: Boolean = false, customer: Boolean = false, leadingIcon: Int? = null, click: () -> Unit): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
             if (emphasized) background = roundRect("#FFFFFF", 10, "#E0E0E0")
@@ -340,12 +347,19 @@ class CloudMineActivity : AppCompatActivity() {
                 foreground = if (focused) roundRect("#00000000", 12, "#212121") else null
             }
             setOnClickListener { click() }
-            if (customer) addView(TextView(this@CloudMineActivity).apply {
-                text = "●"; textSize = 20f; setTextColor(Color.parseColor("#BA987A")); gravity = Gravity.CENTER
-            }, LinearLayout.LayoutParams(dp(36), dp(36)))
+            if (customer) addView(ImageView(this@CloudMineActivity).apply {
+                setImageResource(R.drawable.cloud_headset); setColorFilter(cloudButtonTextColor()); setPadding(dp(8), dp(8), dp(8), dp(8))
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(cloudPrimaryColor(), cloudSecondaryColor()),
+                ).apply { shape = GradientDrawable.OVAL }
+            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) })
+            else if (leadingIcon != null) addView(ImageView(this@CloudMineActivity).apply {
+                setImageResource(leadingIcon); setColorFilter(cloudPrimaryColor()); setPadding(dp(8), dp(8), dp(8), dp(8))
+            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(2) })
             addView(TextView(this@CloudMineActivity).apply {
                 text = title; textSize = 15f; setTextColor(cloudColor("#212121")); if (emphasized) setTypeface(typeface, Typeface.BOLD)
-            }, LinearLayout.LayoutParams(0, -2, 1f).apply { if (!customer) marginStart = 0 })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(TextView(this@CloudMineActivity).apply { text = "›"; textSize = 25f; setTextColor(cloudColor("#9E9E9E")); gravity = Gravity.CENTER })
         }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(50)).apply { if (emphasized) bottomMargin = dp(12) } }
 
