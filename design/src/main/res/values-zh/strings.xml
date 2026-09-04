@@ -159,7 +159,7 @@
     <string name="doubles">双列</string>
     <string name="multiple">多列</string>
     <string name="not_selectable">不可选择</string>
-    <string name="cloud_proxy_group_not_selectable_tips">“%1$s”会自动选择线路，不能在这里手动切换。如需自己指定线路，请进入：%2$s</string>
+    <string name="cloud_proxy_group_not_selectable_tips">“%1$s”会自动选择线路，不能在这里手动切换。请选择：&quot;%2$s&quot;，才能手动切换线路</string>
     <string name="cloud_proxy_group_no_selectable_tips">“%1$s”会自动选择线路。当前订阅没有提供可以手动指定线路的栏目。</string>
     <string name="providers">外部资源</string>
     <string name="unavailable">不可用</string>
