@@ -29,10 +29,14 @@ import android.widget.TextView
 import android.widget.Toast
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceError
+import android.webkit.WebChromeClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.core.content.res.ResourcesCompat
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudSubscription
@@ -416,14 +420,15 @@ class CloudBusinessActivity : AppCompatActivity() {
     private lateinit var pageRoot: LinearLayout
     private val api by lazy { CloudApi(this) }
     private val type by lazy { intent.getStringExtra("type") ?: "plans" }
+    private var creatingOrder = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applyCloudTheme()
         super.onCreate(savedInstanceState)
-        val pageTitle = mapOf("plans" to "会员", "plan_detail" to "商品详情", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单", "skin" to "一键换肤")[type] ?: ""
+        val pageTitle = mapOf("plans" to "会员", "plan_detail" to "商品详情", "payment" to "支付", "pay_success" to "支付结果", "orders" to "我的订单", "invite" to "邀请返利", "tickets" to "意见反馈", "ticket_detail" to "工单详情", "ticket_create" to "创建工单", "skin" to "一键换肤")[type] ?: ""
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            if (type == "plans") setPadding(0, 0, 0, 0)
+            if (type == "plans" || type == "payment" || type == "pay_success") setPadding(0, 0, 0, 0)
             else setPadding(dp(14), dp(14), dp(14), dp(24))
         }
         content.setBackgroundColor(cloudColor("#FAFAFA"))
@@ -433,7 +438,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(cloudColor("#FAFAFA"))
             addView(pageHeader(pageTitle), LinearLayout.LayoutParams(-1, dp(56)))
-            if (type == "plans") addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+            if (type == "plans" || type == "payment" || type == "pay_success") addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
             else addView(ScrollView(this@CloudBusinessActivity).apply { addView(content) }, LinearLayout.LayoutParams(-1, 0, 1f))
         }
         setContentView(pageRoot)
@@ -469,6 +474,8 @@ class CloudBusinessActivity : AppCompatActivity() {
             when (type) {
                 "plans" -> renderPlans(loadPlansWithCache(), runCatching { api.subscription() }.getOrNull())
                 "plan_detail" -> renderPlanDetails(api.planDetails(intent.getStringExtra("plan_id").orEmpty()))
+                "payment" -> renderPayment(intent.getStringExtra("pay_url").orEmpty(), intent.getStringExtra("trade_no").orEmpty())
+                "pay_success" -> renderPaymentSuccess(intent.getStringExtra("trade_no").orEmpty())
                 "orders" -> renderOrders(api.orders())
                 "invite" -> renderInvite(api.inviteSummary(), api.inviteDetails(), api.userInfo())
                 "tickets" -> renderTickets(api.tickets())
@@ -886,7 +893,16 @@ class CloudBusinessActivity : AppCompatActivity() {
             addView(amount, LinearLayout.LayoutParams(0, dp(48), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "立即购买"; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 18); isClickable = true
-                setOnClickListener { lifecycleScope.launch { createAndPay(plan.optString("id"), selected.first, coupon.text.toString().trim()) } }
+                setOnClickListener {
+                    lifecycleScope.launch {
+                        startPurchase(
+                            planId = plan.optString("id"),
+                            period = selected.first,
+                            coupon = coupon.text.toString().trim(),
+                            originalAmount = planPrice(plan, selected.first),
+                        )
+                    }
+                }
             }, LinearLayout.LayoutParams(dp(108), dp(42)))
         }, LinearLayout.LayoutParams(-1, dp(72)))
     }
@@ -952,25 +968,241 @@ class CloudBusinessActivity : AppCompatActivity() {
         else -> java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
     }
 
-    private suspend fun createAndPay(planId: String, period: String, coupon: String) {
+    private suspend fun startPurchase(planId: String, period: String, coupon: String, originalAmount: Long) {
+        if (creatingOrder) return
+        creatingOrder = true
         try {
+            val orders = api.orders().optJSONArray("data") ?: JSONArray()
+            val hasPendingOrder = (0 until orders.length()).any {
+                orders.optJSONObject(it)?.optInt("status", -1) == 0
+            }
+            if (hasPendingOrder) {
+                AlertDialog.Builder(this)
+                    .setTitle("存在待支付订单")
+                    .setMessage("请先处理已有的待支付订单，再购买新的套餐。")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("查看订单") { _, _ -> openBusinessPage("orders") }
+                    .show()
+                return
+            }
+
             val methods = api.paymentMethods().optJSONArray("data") ?: JSONArray()
-            if (methods.length() == 0) throw IllegalStateException("暂无可用支付方式")
-            val names = Array(methods.length()) { methods.optJSONObject(it)?.optString("name") ?: "支付" }
-            AlertDialog.Builder(this).setTitle("选择支付方式").setItems(names) { _, which ->
-                lifecycleScope.launch {
-                    try {
-                        val order = api.createOrder(planId, period, coupon)
-                        val tradeNo = order.optString("data")
-                        val method = methods.optJSONObject(which)?.optString("id").orEmpty()
-                        val pay = api.checkout(tradeNo, method)
-                        val url = pay.opt("data")?.toString().orEmpty()
-                        if (url.startsWith("http")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        else Toast.makeText(this@CloudBusinessActivity, "订单已创建", Toast.LENGTH_LONG).show()
-                    } catch (e: Throwable) { toast(e) }
+            val method = methods.optJSONObject(methods.length() - 1)
+                ?: throw IllegalStateException("暂无可用支付方式")
+            val methodId = method.optString("id")
+            if (methodId.isBlank()) throw IllegalStateException("支付方式不可用")
+
+            val orderResponse = api.createOrder(planId, period, coupon)
+            val tradeNo = when (val data = orderResponse.opt("data")) {
+                is JSONObject -> data.optString("trade_no")
+                null, JSONObject.NULL -> ""
+                else -> data.toString()
+            }
+            if (tradeNo.isBlank()) throw IllegalStateException(orderResponse.optString("message", "订单创建失败"))
+            val detailsResponse = api.orderDetails(tradeNo)
+            val details = detailsResponse.optJSONObject("data") ?: JSONObject()
+            showOrderConfirmation(
+                tradeNo = tradeNo,
+                methodId = methodId,
+                originalAmount = originalAmount,
+                discountAmount = details.optLong("discount_amount"),
+                surplusAmount = details.optLong("surplus_amount"),
+                balanceAmount = details.optLong("balance_amount"),
+                totalAmount = details.optLong("total_amount", originalAmount),
+            )
+        } catch (e: Throwable) {
+            toast(e)
+        } finally {
+            creatingOrder = false
+        }
+    }
+
+    private fun showOrderConfirmation(
+        tradeNo: String,
+        methodId: String,
+        originalAmount: Long,
+        discountAmount: Long,
+        surplusAmount: Long,
+        balanceAmount: Long,
+        totalAmount: Long,
+    ) {
+        val dialog = BottomSheetDialog(this)
+        val sheet = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(10), dp(20), dp(28))
+            setBackgroundColor(cloudColor("#FFFFFF"))
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "确认订单"; textSize = 17f; setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(cloudColor("#212121")); gravity = Gravity.CENTER
+                }, LinearLayout.LayoutParams(0, dp(52), 1f))
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "×"; textSize = 25f; gravity = Gravity.CENTER; setTextColor(cloudColor("#757575"))
+                    isClickable = true; setOnClickListener { dialog.dismiss() }
+                }, LinearLayout.LayoutParams(dp(44), dp(44)))
+            })
+            fun amountRow(label: String, value: Long, emphasized: Boolean = false) =
+                LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                    addView(TextView(this@CloudBusinessActivity).apply {
+                        text = label; textSize = 14f; setTextColor(cloudColor("#616161"))
+                    }, LinearLayout.LayoutParams(0, dp(36), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+                    addView(TextView(this@CloudBusinessActivity).apply {
+                        text = "¥${money(value)}"; textSize = if (emphasized) 16f else 14f
+                        setTextColor(if (emphasized) cloudErrorColor() else cloudColor("#212121"))
+                        if (emphasized) setTypeface(typeface, Typeface.BOLD)
+                    })
                 }
-            }.show()
-        } catch (e: Throwable) { toast(e) }
+            addView(amountRow("订单金额", originalAmount))
+            if (discountAmount > 0) addView(amountRow("优惠券抵扣", discountAmount))
+            if (surplusAmount > 0) addView(amountRow("旧订阅折抵", surplusAmount))
+            if (balanceAmount > 0) addView(amountRow("余额抵扣", balanceAmount))
+            addView(View(this@CloudBusinessActivity).apply {
+                setBackgroundColor(cloudColor("#E0E0E0"))
+            }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); bottomMargin = dp(8) })
+            addView(amountRow("实付金额", totalAmount, true))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "立即支付"; textSize = 15f; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor())
+                background = rounded("#212121", 22); isClickable = true; isFocusable = true
+                setOnClickListener {
+                    dialog.dismiss()
+                    lifecycleScope.launch { checkoutAndOpen(tradeNo, methodId) }
+                }
+            }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(18) })
+        }
+        applyCloudTypography(sheet)
+        dialog.setContentView(sheet)
+        dialog.show()
+    }
+
+    private suspend fun checkoutAndOpen(tradeNo: String, methodId: String) {
+        try {
+            val response = api.checkout(tradeNo, methodId)
+            val url = response.opt("data")?.takeUnless { it == JSONObject.NULL }?.toString().orEmpty()
+            if (response.optInt("type") == -1) {
+                openPaymentSuccess(tradeNo)
+            } else if (url.startsWith("http://") || url.startsWith("https://")) {
+                startActivity(Intent(this, CloudBusinessActivity::class.java)
+                    .putExtra("type", "payment")
+                    .putExtra("pay_url", url)
+                    .putExtra("trade_no", tradeNo))
+            } else {
+                throw IllegalStateException(response.optString("message", "支付地址异常"))
+            }
+        } catch (e: Throwable) {
+            toast(e)
+        }
+    }
+
+    private fun openBusinessPage(pageType: String) {
+        startActivity(Intent(this, CloudBusinessActivity::class.java).putExtra("type", pageType))
+    }
+
+    private fun openPaymentSuccess(tradeNo: String) {
+        startActivity(Intent(this, CloudBusinessActivity::class.java)
+            .putExtra("type", "pay_success")
+            .putExtra("trade_no", tradeNo))
+    }
+
+    private fun renderPayment(payUrl: String, tradeNo: String) {
+        content.removeAllViews()
+        if (!payUrl.startsWith("http://") && !payUrl.startsWith("https://")) {
+            addText("支付地址异常", 15f, "#B00020")
+            return
+        }
+        val progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = 0
+        }
+        content.addView(progress, LinearLayout.LayoutParams(-1, dp(4)))
+        val webView = WebView(this).apply {
+            setBackgroundColor(cloudColor("#FFFFFF"))
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.javaScriptCanOpenWindowsAutomatically = true
+            webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    progress.progress = newProgress
+                    progress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+                }
+            }
+            webViewClient = object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                    val target = request.url.toString()
+                    val upper = target.uppercase()
+                    if (upper.contains("TRADE_STATUS=TRADE_SUCCES") || upper.contains("TRADE_STATUS=TRADE_SUCCESS")) {
+                        openPaymentSuccess(tradeNo)
+                        finish()
+                        return true
+                    }
+                    if (upper.contains("TRADE_STATUS=TRADE_FAILED") || upper.contains("TRADE_STATUS=TRADE_CLOSED") || upper.contains("PAY_STATUS=FAILED")) {
+                        Toast.makeText(this@CloudBusinessActivity, "支付未完成", Toast.LENGTH_LONG).show()
+                        finish()
+                        return true
+                    }
+                    if (target.startsWith("https://wx.tenpay.com") && request.requestHeaders["Referer"] != "H5 Referer") {
+                        view.loadUrl(target, mapOf("Referer" to "H5 Referer"))
+                        return true
+                    }
+                    if (target.startsWith("http://") || target.startsWith("https://")) return false
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+                        .onFailure { Toast.makeText(this@CloudBusinessActivity, "未找到可处理此支付方式的应用", Toast.LENGTH_LONG).show() }
+                    return true
+                }
+
+                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                    super.onReceivedError(view, request, error)
+                    if (request.isForMainFrame) {
+                        Toast.makeText(this@CloudBusinessActivity, "支付页面加载失败，可返回后重试", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            loadUrl(payUrl)
+        }
+        content.addView(webView, LinearLayout.LayoutParams(-1, 0, 1f))
+    }
+
+    private fun renderPaymentSuccess(tradeNo: String) {
+        content.removeAllViews()
+        content.gravity = Gravity.CENTER
+        getSharedPreferences("cloud_payment", MODE_PRIVATE).edit().putBoolean("refresh_pending", true).apply()
+        val status = TextView(this).apply {
+            text = "正在同步会员信息…"; textSize = 13f; gravity = Gravity.CENTER
+            setTextColor(cloudColor("#757575")); setPadding(dp(24), dp(14), dp(24), 0)
+        }
+        content.addView(ImageView(this).apply {
+            setImageResource(R.drawable.cloud_succeed)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+        }, LinearLayout.LayoutParams(dp(58), dp(58)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+        content.addView(TextView(this).apply {
+            text = "支付成功"; textSize = 20f; gravity = Gravity.CENTER; setTextColor(cloudColor("#212121"))
+            setPadding(0, dp(12), 0, 0)
+        }, LinearLayout.LayoutParams(-1, -2))
+        content.addView(status, LinearLayout.LayoutParams(-1, -2))
+        content.addView(TextView(this).apply {
+            text = "返回仪表盘"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(cloudColor("#212121"))
+            background = rounded("#FFFFFF", 8, "#9E9E9E"); isClickable = true; isFocusable = true
+            setOnClickListener {
+                getSharedPreferences("cloud_payment", MODE_PRIVATE).edit().putBoolean("refresh_pending", true).apply()
+                startActivity(Intent(this@CloudBusinessActivity, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+                finish()
+            }
+        }, LinearLayout.LayoutParams(dp(150), dp(42)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(24) })
+        lifecycleScope.launch {
+            var synchronized = false
+            repeat(15) { attempt ->
+                if (!synchronized) {
+                    val order = runCatching { api.orderDetails(tradeNo) }.getOrNull()?.optJSONObject("data")
+                    if (order != null && order.optInt("status", 0) != 0) {
+                        synchronized = runCatching { api.subscription() }.isSuccess
+                    }
+                    if (!synchronized && attempt < 14) delay(2_000)
+                }
+            }
+            status.text = if (synchronized) "会员信息已同步" else "后台仍在处理中，返回仪表盘后将继续刷新"
+        }
     }
 
     private fun renderOrders(json: JSONObject) {

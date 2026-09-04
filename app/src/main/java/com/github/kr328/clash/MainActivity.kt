@@ -102,11 +102,13 @@ class MainActivity : BaseActivity<MainDesign>() {
                                     design.fetch()
                                 }
                             }
-                            if (it == Event.ActivityStart &&
-                                CloudSession(this@MainActivity).loggedIn &&
-                                cloudSubscription == null
-                            ) {
-                                this@MainActivity.launch { refreshCloudSubscription(design) }
+                            if (it == Event.ActivityStart && CloudSession(this@MainActivity).loggedIn) {
+                                val paymentState = getSharedPreferences("cloud_payment", MODE_PRIVATE)
+                                val paymentRefreshPending = paymentState.getBoolean("refresh_pending", false)
+                                if (paymentRefreshPending) paymentState.edit().remove("refresh_pending").apply()
+                                if (cloudSubscription == null || paymentRefreshPending) {
+                                    this@MainActivity.launch { refreshCloudSubscription(design) }
+                                }
                             }
                         }
                         else -> Unit
