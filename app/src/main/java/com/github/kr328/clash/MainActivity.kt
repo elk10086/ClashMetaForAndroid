@@ -30,6 +30,7 @@ import com.github.kr328.clash.service.model.Profile
 import com.github.kr328.clash.service.PreviewService
 import com.github.kr328.clash.common.compat.startForegroundServiceCompat
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -38,14 +39,11 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.net.HttpURLConnection
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.net.URL
 import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.design.R as DesignR
@@ -54,7 +52,7 @@ class MainActivity : BaseActivity<MainDesign>() {
     private val connectionClock by lazy { getSharedPreferences("cloud_connection_clock", MODE_PRIVATE) }
     private val membershipCache by lazy { getSharedPreferences("cloud_membership_cache", MODE_PRIVATE) }
     private val subscriptionMutex = Mutex()
-    private val networkDetectionMutex = Mutex()
+    private var networkDetectionJob: Job? = null
     private var cloudSubscription: CloudSubscription? = null
     private var cloudSyncError: String? = null
     private var previewCoreRunning = false
@@ -74,7 +72,7 @@ class MainActivity : BaseActivity<MainDesign>() {
 
         cloudSubscription = loadCachedCloudSubscription()
         design.fetch()
-        launch { detectNetwork(design) }
+        if (cachedNetworkResult == null) requestNetworkDetection(design)
         launch { runCatching { CloudReleaseManager.checkOnLaunch(this@MainActivity) } }
         if (CloudSession(this).loggedIn) launch { refreshCloudSubscription(design) }
 
@@ -90,16 +88,12 @@ class MainActivity : BaseActivity<MainDesign>() {
                         Event.ProfileLoaded, Event.ProfileChanged -> {
                             syncConnectionClock()
                             design.fetch()
-                            if (it == Event.ActivityStart ||
-                                it == Event.ClashStop ||
+                            if (it == Event.ClashStop ||
                                 it == Event.ClashStart ||
                                 it == Event.ProfileLoaded ||
                                 it == Event.ProfileChanged
                             ) {
-                                this@MainActivity.launch {
-                                    delay(500)
-                                    detectNetwork(design)
-                                }
+                                requestNetworkDetection(design, 500)
                             }
                             if (it == Event.ClashStop && CloudSession(this@MainActivity).loggedIn) {
                                 this@MainActivity.launch {
@@ -141,7 +135,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                             openPrimary(CloudMineActivity::class.java)
                         MainDesign.Request.OpenPlans ->
                             startActivity(Intent(this@MainActivity, CloudBusinessActivity::class.java).putExtra("type", "plans"))
-                        MainDesign.Request.DetectNetwork -> launch { detectNetwork(design) }
+                        MainDesign.Request.DetectNetwork -> requestNetworkDetection(design)
                         MainDesign.Request.ChangeMode -> {
                             val mode = design.takeSelectedMode()
                             withClash {
@@ -150,10 +144,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                                 patchOverride(Clash.OverrideSlot.Session, override)
                             }
                             design.setMode(mode)
-                            launch {
-                                delay(500)
-                                detectNetwork(design)
-                            }
+                            requestNetworkDetection(design, 500)
                         }
                     }
                 }
@@ -179,7 +170,7 @@ class MainActivity : BaseActivity<MainDesign>() {
         syncConnectionClock()
         setClashRunning(clashRunning)
         setConnectionTime(formatConnectionTime())
-        setNetworkResult(getString(DesignR.string.cloud_dashboard_detection_hint))
+        setNetworkResult(cachedNetworkResult ?: getString(DesignR.string.cloud_dashboard_detection_hint))
 
         val state = withClash {
             queryTunnelState()
@@ -402,20 +393,26 @@ class MainActivity : BaseActivity<MainDesign>() {
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
-    private suspend fun detectNetwork(design: MainDesign) {
-        networkDetectionMutex.withLock {
-            design.setNetworkResult(getString(DesignR.string.cloud_dashboard_detecting))
-            // PreviewService only loads groups for browsing. Before the user starts
-            // the VPN, network detection must report the device's direct public IP.
-            val ipInfo = queryFirstIpInfo(useClashProxy = clashRunning)
-            val result = ipInfo?.let { (ip, country) ->
-                listOf(countryFlag(country), ip).filter { it.isNotBlank() }.joinToString(" ")
-            } ?: getString(DesignR.string.cloud_dashboard_detection_timeout)
-            design.setNetworkResult(result)
+    private fun requestNetworkDetection(design: MainDesign, delayMillis: Long = 0L) {
+        networkDetectionJob?.cancel()
+        networkDetectionJob = launch {
+            if (delayMillis > 0) delay(delayMillis)
+            detectNetwork(design)
         }
     }
 
-    private suspend fun queryFirstIpInfo(useClashProxy: Boolean): Pair<String, String>? = coroutineScope {
+    private suspend fun detectNetwork(design: MainDesign) {
+        design.setNetworkResult(getString(DesignR.string.cloud_dashboard_detecting))
+        val ipInfo = queryFirstIpInfo()
+        val result = ipInfo?.let { (ip, country) ->
+            listOf(countryFlag(country), ip).filter { it.isNotBlank() }.joinToString(" ")
+        } ?: getString(DesignR.string.cloud_dashboard_detection_timeout)
+        cachedNetworkResult = result
+        design.setNetworkResult(result)
+    }
+
+    /** Matches free_time_new: race all providers directly and keep the first valid response. */
+    private suspend fun queryFirstIpInfo(): Pair<String, String>? = coroutineScope {
         val sources = listOf(
             "https://ipwho.is" to Pair("ip", "country_code"),
             "https://api.myip.com" to Pair("ip", "cc"),
@@ -428,14 +425,10 @@ class MainActivity : BaseActivity<MainDesign>() {
         val requests = sources.map { (endpoint, fields) ->
             async(Dispatchers.IO) {
                 runCatching {
-                    val connection = if (useClashProxy) {
-                        val clashProxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", 7890))
-                        URL(endpoint).openConnection(clashProxy)
-                    } else {
-                        URL(endpoint).openConnection()
-                    } as HttpURLConnection
+                    val connection = URL(endpoint).openConnection() as HttpURLConnection
                     connection.connectTimeout = 10_000
                     connection.readTimeout = 10_000
+                    connection.useCaches = false
                     connection.setRequestProperty("Accept", "application/json")
                     connection.setRequestProperty("User-Agent", ClientUserAgent.value(this@MainActivity))
                     try {
@@ -450,18 +443,20 @@ class MainActivity : BaseActivity<MainDesign>() {
                 }.getOrNull()
             }
         }.toMutableList()
-        while (requests.any { !it.isCompleted }) {
-            requests.firstOrNull { it.isCompleted }?.let { completed ->
-                val value = completed.await()
-                requests.remove(completed)
-                if (value != null) {
-                    requests.forEach { it.cancel() }
-                    return@coroutineScope value
+        try {
+            while (requests.isNotEmpty()) {
+                val (completedIndex, value) = select<Pair<Int, Pair<String, String>?>> {
+                    requests.forEachIndexed { index, request ->
+                        request.onAwait { index to it }
+                    }
                 }
+                requests.removeAt(completedIndex)
+                if (value != null) return@coroutineScope value
             }
-            delay(20)
+            null
+        } finally {
+            requests.forEach { it.cancel() }
         }
-        requests.awaitAll().firstOrNull { it != null }
     }
 
     private fun countryFlag(code: String): String {
@@ -568,5 +563,11 @@ class MainActivity : BaseActivity<MainDesign>() {
     private fun openPrimary(target: Class<*>) {
         startActivity(Intent(this, target).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         overridePendingTransition(0, 0)
+    }
+
+    private companion object {
+        /** Riverpod's keepAlive equivalent for Activity-backed bottom-tab navigation. */
+        @Volatile
+        var cachedNetworkResult: String? = null
     }
 }
