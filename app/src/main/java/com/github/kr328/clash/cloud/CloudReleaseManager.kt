@@ -138,112 +138,152 @@ object CloudReleaseManager {
         if (!hasAnnouncementContent(data)) return
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
-            val density = activity.resources.displayMetrics.density
-            fun dp(value: Int) = (value * density).toInt()
-            fun rounded(fill: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply {
-                setColor(fill)
-                cornerRadius = dp(radius).toFloat()
-                stroke?.let { setStroke(dp(1), it) }
-            }
-
-            val primary = activity.resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
-            val onPrimary = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
-            val surface = activity.resolveThemedColor(com.google.android.material.R.attr.colorSurface)
-            val onSurface = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
-            val outline = activity.resolveThemedColor(com.google.android.material.R.attr.colorOutline)
-
-            val root = LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(22), dp(20), dp(22), dp(20))
-                background = rounded(surface, 22, outline)
-            }
-            val header = LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-            }
-            header.addView(TextView(activity).apply {
-                text = title.ifBlank { "公告" }
-                textSize = 19f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(onSurface)
-                maxLines = 2
-            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-
-            val close = TextView(activity).apply {
-                text = "×"
-                contentDescription = "关闭公告"
-                gravity = Gravity.CENTER
-                textSize = 25f
-                setTextColor(onSurface)
-                background = rounded(Color.TRANSPARENT, 18, outline)
-                isClickable = true
-                isFocusable = true
-            }
-            header.addView(close, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginStart = dp(12) })
-            root.addView(header)
-
-            val message = TextView(activity).apply {
-                text = content
-                textSize = 15f
-                setTextColor(onSurface)
-                setLineSpacing(dp(4).toFloat(), 1f)
-                visibility = if (content.isBlank()) View.GONE else View.VISIBLE
-            }
-            val scroll = object : ScrollView(activity) {
-                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-                    setMeasuredDimension(measuredWidth, measuredHeight.coerceAtMost(dp(320)))
-                }
-            }.apply {
-                isFillViewport = false
-                clipToPadding = false
-                addView(message, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-            }
-            root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                topMargin = if (content.isBlank()) 0 else dp(18)
-            })
-
-            val action = MaterialButton(activity).apply {
-                text = if (openLink) data.optString("btnTitle").ifBlank { "关闭" } else "关闭"
-                textSize = 15f
-                setTextColor(onPrimary)
-                setTypeface(typeface, Typeface.BOLD)
-                backgroundTintList = ColorStateList.valueOf(primary)
-                cornerRadius = dp(14)
-                insetTop = 0
-                insetBottom = 0
-            }
-            root.addView(action, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)).apply {
-                topMargin = dp(22)
-            })
-
-            val dialog = AlertDialog.Builder(activity)
-                .setView(root, 0, 0, 0, 0)
-                .create()
-            dialog.setOnDismissListener {
-                onDismiss?.invoke()
-            }
-            close.setOnClickListener { dialog.dismiss() }
-            action.setOnClickListener {
+            showCardDialog(
+                activity = activity,
+                title = title.ifBlank { "公告" },
+                content = content,
+                primaryLabel = if (openLink) data.optString("btnTitle").ifBlank { "关闭" } else "关闭",
+                closeDescription = "关闭公告",
+                showClose = true,
+                cancelable = true,
+                onDismiss = onDismiss,
+            ) {
                 if (!openLink) {
-                    dialog.dismiss()
+                    true
                 } else {
                     val target = resolveOfficialSiteUrl(data)
                     runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
-                        .onSuccess { dialog.dismiss() }
                         .onFailure { Toast.makeText(activity, "无法打开公告链接", Toast.LENGTH_LONG).show() }
+                        .isSuccess
                 }
             }
-            dialog.setOnShowListener {
-                val width = (activity.resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(480))
-                dialog.window?.apply {
-                    setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-                    setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
-                    setDimAmount(0.42f)
-                }
-            }
-            dialog.show()
         }
+    }
+
+    private fun showCardDialog(
+        activity: AppCompatActivity,
+        title: String,
+        content: String,
+        primaryLabel: String,
+        closeDescription: String,
+        showClose: Boolean,
+        cancelable: Boolean,
+        secondaryLabel: String? = null,
+        onDismiss: (() -> Unit)? = null,
+        onPrimary: () -> Boolean,
+    ) {
+        val density = activity.resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        fun rounded(fill: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply {
+            setColor(fill)
+            cornerRadius = dp(radius).toFloat()
+            stroke?.let { setStroke(dp(1), it) }
+        }
+
+        val primary = activity.resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+        val onPrimaryColor = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
+        val surface = activity.resolveThemedColor(com.google.android.material.R.attr.colorSurface)
+        val onSurface = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+        val outline = activity.resolveThemedColor(com.google.android.material.R.attr.colorOutline)
+
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(22), dp(20), dp(22), dp(20))
+            background = rounded(surface, 22, outline)
+        }
+        val header = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        header.addView(TextView(activity).apply {
+            text = title
+            textSize = 19f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(onSurface)
+            maxLines = 2
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+        val close = if (showClose) TextView(activity).apply {
+            text = "×"
+            this.contentDescription = closeDescription
+            gravity = Gravity.CENTER
+            textSize = 25f
+            setTextColor(onSurface)
+            background = rounded(Color.TRANSPARENT, 18, outline)
+            isClickable = true
+            isFocusable = true
+        }.also {
+            header.addView(it, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginStart = dp(12) })
+        } else null
+        root.addView(header)
+
+        val message = TextView(activity).apply {
+            text = content
+            textSize = 15f
+            setTextColor(onSurface)
+            setLineSpacing(dp(4).toFloat(), 1f)
+            visibility = if (content.isBlank()) View.GONE else View.VISIBLE
+        }
+        val scroll = object : ScrollView(activity) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                setMeasuredDimension(measuredWidth, measuredHeight.coerceAtMost(dp(320)))
+            }
+        }.apply {
+            isFillViewport = false
+            clipToPadding = false
+            addView(message, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+            topMargin = if (content.isBlank()) 0 else dp(18)
+        })
+
+        fun actionButton(label: String, filled: Boolean) = MaterialButton(activity).apply {
+            text = label
+            textSize = 15f
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(if (filled) onPrimaryColor else onSurface)
+            backgroundTintList = ColorStateList.valueOf(if (filled) primary else surface)
+            strokeColor = ColorStateList.valueOf(if (filled) primary else outline)
+            strokeWidth = if (filled) 0 else dp(1)
+            cornerRadius = dp(14)
+            insetTop = 0
+            insetBottom = 0
+        }
+
+        val actions = LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val secondary = secondaryLabel?.let { label ->
+            actionButton(label, false).also {
+                actions.addView(it, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
+            }
+        }
+        val primaryAction = actionButton(primaryLabel, true)
+        actions.addView(primaryAction, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+            if (secondary != null) marginStart = dp(5)
+        })
+        root.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)).apply { topMargin = dp(22) })
+
+        val dialog = AlertDialog.Builder(activity)
+            .setView(root, 0, 0, 0, 0)
+            .create()
+        dialog.setCancelable(cancelable)
+        dialog.setCanceledOnTouchOutside(cancelable)
+        dialog.setOnDismissListener { onDismiss?.invoke() }
+        close?.setOnClickListener { dialog.dismiss() }
+        secondary?.setOnClickListener { dialog.dismiss() }
+        primaryAction.setOnClickListener { if (onPrimary()) dialog.dismiss() }
+        dialog.setOnShowListener {
+            val width = (activity.resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(480))
+            dialog.window?.apply {
+                setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                setDimAmount(0.42f)
+            }
+        }
+        dialog.show()
     }
 
     private fun showUpdate(activity: AppCompatActivity, data: JSONObject): Boolean {
@@ -255,27 +295,26 @@ object CloudReleaseManager {
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed || updateDialogVisible) return@runOnUiThread
             updateDialogVisible = true
-            val dialog = AlertDialog.Builder(activity)
-                .setTitle(if (flag == 2) "版本更新" else "有新版本啦")
-                .setMessage("最新版本：${remote.removePrefix("v")}\n当前版本：$local\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}")
-                .setPositiveButton("立即更新", null)
-                .apply { if (flag != 2) setNegativeButton("稍后再说", null) }
-                .create()
-            dialog.setCancelable(flag != 2)
-            dialog.setCanceledOnTouchOutside(flag != 2)
-            dialog.setOnDismissListener { updateDialogVisible = false }
-            dialog.setOnShowListener {
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    val url = data.optString("updateAddress_android").ifBlank { data.optString("updateAddress") }.trim()
-                    if (url.isBlank()) {
-                        Toast.makeText(activity, "当前没有可用的 Android 下载地址", Toast.LENGTH_LONG).show()
-                    } else {
-                        dialog.dismiss()
-                        openUpdatePage(activity, data, remote.removePrefix("v"), local, flag == 2, false)
-                    }
+            showCardDialog(
+                activity = activity,
+                title = if (flag == 2) "版本更新" else "有新版本啦",
+                content = "最新版本：${remote.removePrefix("v")}\n当前版本：$local\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}",
+                primaryLabel = "立即更新",
+                closeDescription = "关闭更新提示",
+                showClose = flag != 2,
+                cancelable = flag != 2,
+                secondaryLabel = if (flag != 2) "稍后再说" else null,
+                onDismiss = { updateDialogVisible = false },
+            ) {
+                val url = data.optString("updateAddress_android").ifBlank { data.optString("updateAddress") }.trim()
+                if (url.isBlank()) {
+                    Toast.makeText(activity, "当前没有可用的 Android 下载地址", Toast.LENGTH_LONG).show()
+                    false
+                } else {
+                    openUpdatePage(activity, data, remote.removePrefix("v"), local, flag == 2, false)
+                    true
                 }
             }
-            dialog.show()
         }
         return true
     }
