@@ -1,13 +1,14 @@
 package com.github.kr328.clash.core.util
 
 import com.github.kr328.clash.core.model.Traffic
+import java.util.Locale
 
 fun Traffic.trafficUpload(): String {
-    return trafficString(scaleTraffic(this ushr 32))
+    return trafficRateString(scaleTraffic(this ushr 32))
 }
 
 fun Traffic.trafficDownload(): String {
-    return trafficString(scaleTraffic(this and 0xFFFFFFFF))
+    return trafficRateString(scaleTraffic(this and 0xFFFFFFFF))
 }
 
 fun Traffic.trafficTotal(): String {
@@ -15,6 +16,19 @@ fun Traffic.trafficTotal(): String {
     val download = scaleTraffic(this and 0xFFFFFFFF)
 
     return trafficString(upload + download)
+}
+
+/** Matches free_time_new's compact real-time rate units: B, KB, MB, GB and TB. */
+private fun trafficRateString(bytes: Long): String {
+    val units = arrayOf("B", "KB", "MB", "GB", "TB")
+    var value = bytes.toDouble()
+    var unitIndex = 0
+    while (value >= 1024.0 && unitIndex < units.lastIndex) {
+        value /= 1024.0
+        unitIndex++
+    }
+    val amount = String.format(Locale.US, "%.1f", value).removeSuffix(".0")
+    return "$amount${units[unitIndex]}"
 }
 
 private fun trafficString(scaled: Long): String {
