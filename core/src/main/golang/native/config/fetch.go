@@ -17,8 +17,10 @@ import (
 	"cfa/native/app"
 
 	"github.com/metacubex/mihomo/adapter/provider"
+	clashCa "github.com/metacubex/mihomo/component/ca"
 	clashHttp "github.com/metacubex/mihomo/component/http"
 	RB "github.com/metacubex/mihomo/rules/bundle"
+	"github.com/metacubex/tls"
 )
 
 type Status struct {
@@ -39,7 +41,16 @@ type fetchHeader struct {
 }
 
 func openUrl(ctx context.Context, url, userAgent string) (io.ReadCloser, fetchHeader, error) {
-	response, err := clashHttp.HttpRequest(ctx, url, http.MethodGet, http.Header{"User-Agent": {userAgent}}, nil)
+	// free_time_new accepts the certificates used by configured HTTPS IP
+	// subscription fallbacks. Keep the compatibility scoped to profile fetches.
+	response, err := clashHttp.HttpRequest(
+		ctx,
+		url,
+		http.MethodGet,
+		http.Header{"User-Agent": {userAgent}},
+		nil,
+		clashHttp.WithCAOption(clashCa.Option{TLSConfig: &tls.Config{InsecureSkipVerify: true}}), //nolint:gosec
+	)
 
 	if err != nil {
 		return nil, fetchHeader{}, err
