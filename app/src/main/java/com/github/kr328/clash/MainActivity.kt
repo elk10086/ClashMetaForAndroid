@@ -98,6 +98,9 @@ class MainActivity : BaseActivity<MainDesign>() {
                         Event.ProfileLoaded, Event.ProfileChanged -> {
                             syncConnectionClock()
                             design.fetch()
+                            if (it == Event.ActivityStart && consumeNetworkRefreshPending()) {
+                                requestNetworkDetection(design, 500)
+                            }
                             if (it == Event.ClashStop ||
                                 it == Event.ClashStart ||
                                 it == Event.ProfileLoaded ||
@@ -441,6 +444,14 @@ class MainActivity : BaseActivity<MainDesign>() {
             if (delayMillis > 0) delay(delayMillis)
             detectNetwork(design)
         }
+    }
+
+    private fun consumeNetworkRefreshPending(): Boolean {
+        val state = getSharedPreferences("cloud_dashboard_state", MODE_PRIVATE)
+        if (!state.getBoolean("network_refresh_pending", false)) return false
+        state.edit().remove("network_refresh_pending").apply()
+        cachedNetworkResult = null
+        return true
     }
 
     private suspend fun detectNetwork(design: MainDesign) {

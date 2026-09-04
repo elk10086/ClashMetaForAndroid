@@ -93,6 +93,11 @@ class ProxyActivity : BaseActivity<ProxyDesign>() {
                                 states[it.index].now = it.name
                             }
 
+                            getSharedPreferences("cloud_dashboard_state", MODE_PRIVATE)
+                                .edit()
+                                .putBoolean("network_refresh_pending", true)
+                                .apply()
+
                             design.requestRedrawVisible()
                         }
                         is ProxyDesign.Request.UrlTest -> {
