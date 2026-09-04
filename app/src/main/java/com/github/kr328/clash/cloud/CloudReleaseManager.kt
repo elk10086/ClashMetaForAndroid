@@ -12,7 +12,6 @@ import com.github.kr328.clash.CloudUpdateActivity
 import org.json.JSONObject
 
 object CloudReleaseManager {
-    private const val PREFS = "cloud_release"
     @Volatile private var updateDialogVisible = false
 
     suspend fun checkOnLaunch(activity: AppCompatActivity): JSONObject? {
@@ -32,21 +31,6 @@ object CloudReleaseManager {
     fun showLoginAnnouncement(activity: AppCompatActivity, data: JSONObject, automatic: Boolean = false) =
         showAnnouncement(activity, data, automatic, openLink = true)
 
-    fun isDashboardAnnouncementUnread(context: Context, data: JSONObject): Boolean {
-        if (data.optInt("show", 0) != 1 || !hasAnnouncementContent(data)) return false
-        return !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean("dashboard_announcement_read_${announcementSignature(data)}", false)
-    }
-
-    fun showDashboardAnnouncement(activity: AppCompatActivity, data: JSONObject, onRead: () -> Unit) {
-        showAnnouncement(activity, data, automatic = false, openLink = false) {
-            activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putBoolean("dashboard_announcement_read_${announcementSignature(data)}", true)
-                .apply()
-            onRead()
-        }
-    }
-
     suspend fun checkUpdate(activity: AppCompatActivity) {
         val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return
         val remote = data.optString("version").trim().removePrefix("v")
@@ -61,13 +45,19 @@ object CloudReleaseManager {
         return data.optString("customerServiceUrl", data.optString("customer_service_url"))
     }
 
-    /** The login "anti-loss" link follows free_time_new: remote img_url first, brand site fallback. */
+    /** Login anti-loss address: announcement link first, then the backend entry domain. */
     suspend fun officialSiteUrl(context: Context): String {
-        val raw = CloudApi(context).remoteConfig().optJSONObject("data")
-            ?.optString("img_url")
-            ?.trim()
-            .orEmpty()
-        if (raw.isBlank()) return BuildConfig.BRAND_OFFICIAL_SITE_URL
+        val data = CloudApi(context).remoteConfig().optJSONObject("data")
+        return resolveOfficialSiteUrl(data)
+    }
+
+    private fun resolveOfficialSiteUrl(data: JSONObject?): String {
+        val raw = sequenceOf(
+            data?.optString("img_url"),
+            data?.optString("baseUrl"),
+            data?.optJSONArray("loginDomains")?.optString(0),
+            BuildConfig.BRAND_OFFICIAL_SITE_URL,
+        ).mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }.first()
         val normalized = if (raw.contains("://")) raw else "https://$raw"
         val uri = runCatching { Uri.parse(normalized) }.getOrNull()
         return if (uri != null && uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()) {
@@ -80,11 +70,6 @@ object CloudReleaseManager {
     private fun hasAnnouncementContent(data: JSONObject): Boolean =
         data.optString("title").isNotBlank() || data.optString("content").isNotBlank() || data.optString("img_url").isNotBlank()
 
-    private fun announcementSignature(data: JSONObject): String {
-        val raw = "${data.optString("title")}|${data.optString("content")}|${data.optString("btnTitle")}|${data.optString("img_url")}"
-        return raw.hashCode().toString()
-    }
-
     private fun showAnnouncement(
         activity: AppCompatActivity,
         data: JSONObject,
@@ -92,13 +77,12 @@ object CloudReleaseManager {
         openLink: Boolean,
         onDismiss: (() -> Unit)? = null,
     ) {
-        if (automatic && data.optInt("show", 0) != 1) return
+        val show = data.optInt("show", 0)
+        if (automatic && show != 2) return
+        if (!automatic && show !in 1..2) return
         val title = data.optString("title").trim()
         val content = data.optString("content").trim()
         if (!hasAnnouncementContent(data)) return
-        val signature = announcementSignature(data)
-        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        if (automatic && prefs.getBoolean("announcement_auto_shown_$signature", false)) return
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
             val dialog = AlertDialog.Builder(activity)
@@ -107,7 +91,6 @@ object CloudReleaseManager {
                 .setPositiveButton(data.optString("btnTitle").ifBlank { if (openLink) "关闭" else "我知道了" }, null)
                 .create()
             dialog.setOnDismissListener {
-                if (automatic) prefs.edit().putBoolean("announcement_auto_shown_$signature", true).apply()
                 onDismiss?.invoke()
             }
             dialog.setOnShowListener {
@@ -115,8 +98,7 @@ object CloudReleaseManager {
                     if (!openLink) {
                         dialog.dismiss()
                     } else {
-                        val raw = data.optString("img_url").trim().ifBlank { BuildConfig.BRAND_OFFICIAL_SITE_URL }
-                        val target = if (raw.contains("://")) raw else "https://$raw"
+                        val target = resolveOfficialSiteUrl(data)
                         runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
                             .onSuccess { dialog.dismiss() }
                             .onFailure { Toast.makeText(activity, "无法打开公告链接", Toast.LENGTH_LONG).show() }

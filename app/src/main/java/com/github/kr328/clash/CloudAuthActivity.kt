@@ -58,7 +58,7 @@ class CloudAuthActivity : AppCompatActivity() {
             runCatching { CloudReleaseManager.announcementData(this@CloudAuthActivity) }.getOrNull()?.let { data ->
                 announcementData = data
                 val hasContent = data.optString("title").isNotBlank() || data.optString("content").isNotBlank() || data.optString("img_url").isNotBlank()
-                announcementEntry?.visibility = if (data.optInt("show", 0) == 1 && hasContent) View.VISIBLE else View.GONE
+                announcementEntry?.visibility = if (data.optInt("show", 0) in 1..2 && hasContent) View.VISIBLE else View.GONE
                 if (step == Step.LOGIN) CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, data, automatic = true)
             }
         }
@@ -262,7 +262,7 @@ class CloudAuthActivity : AppCompatActivity() {
                     setPadding(dp(8), 0, dp(8), 0)
                     isClickable = true
                     isFocusable = true
-                    visibility = if (announcementData?.optInt("show", 0) == 1) View.VISIBLE else View.GONE
+                    visibility = if ((announcementData?.optInt("show", 0) ?: 0) in 1..2) View.VISIBLE else View.GONE
                     setOnClickListener { announcementData?.let { CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, it) } }
                 }
                 addView(announcementEntry, FrameLayout.LayoutParams(-2, dp(44), Gravity.TOP or Gravity.END).apply {

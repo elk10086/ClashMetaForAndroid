@@ -28,7 +28,6 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         OpenProfiles,
         OpenSettings,
         OpenPlans,
-        OpenAnnouncement,
         DetectNetwork,
         ChangeMode,
     }
@@ -98,13 +97,6 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         }
     }
 
-    suspend fun setAnnouncement(title: String, visible: Boolean) {
-        withContext(Dispatchers.Main) {
-            binding.announcementTitle = "官方公告：$title"
-            binding.announcementVisible = visible
-        }
-    }
-
     init {
         binding.self = this
         binding.networkResult = context.getString(R.string.cloud_dashboard_detection_hint)
@@ -115,8 +107,6 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.cloudExpiry = ""
         binding.cloudUsage = ""
         binding.cloudProgress = 0
-        binding.announcementTitle = ""
-        binding.announcementVisible = false
     }
 
     fun request(request: Request) {
