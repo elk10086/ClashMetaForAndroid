@@ -180,6 +180,7 @@ private fun Context.applyCloudTypography(view: View) {
 
 class CloudMineActivity : AppCompatActivity() {
     private lateinit var expiryView: TextView
+    private lateinit var accountView: TextView
     private var appliedThemeSignature = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -195,10 +196,11 @@ class CloudMineActivity : AppCompatActivity() {
                 addView(ImageView(this@CloudMineActivity).apply {
                     setImageResource(R.drawable.cloud_avatar); scaleType = ImageView.ScaleType.CENTER_CROP
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
-                addView(TextView(this@CloudMineActivity).apply {
-                    text = maskEmail(CloudSession(this@CloudMineActivity).email)
+                accountView = TextView(this@CloudMineActivity).apply {
+                    text = ""
                     textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL)
-                }, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+                }
+                addView(accountView, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
             })
             addView(vipBanner())
             addView(actionRow("检查更新", emphasized = true, leadingIcon = DesignR.drawable.ic_outline_update) {
@@ -214,7 +216,7 @@ class CloudMineActivity : AppCompatActivity() {
                         .onFailure { toast(it) }
                 }
             })
-            addView(actionRow("刷新服务配置") { confirmRefreshServiceConfig() })
+            addView(actionRow("清除远端缓存") { confirmRefreshServiceConfig() })
             addView(actionRow("主题") {
                 startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java))
             })
@@ -235,6 +237,7 @@ class CloudMineActivity : AppCompatActivity() {
         }.also { applyCloudTypography(it) })
         lifecycleScope.launch {
             runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
+                accountView.text = maskEmail(subscription.email)
                 val text = if (subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()) {
                     "已过期"
                 } else if (subscription.expiresAt > 0) {
@@ -280,8 +283,8 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun confirmRefreshServiceConfig() {
         AlertDialog.Builder(this)
-            .setTitle("刷新服务配置")
-            .setMessage("清除当前缓存并重新获取远端服务地址？")
+            .setTitle("清除远端缓存")
+            .setMessage("清除远端服务地址缓存并重新获取？")
             .setNegativeButton("取消", null)
             .setPositiveButton("刷新") { _, _ ->
                 CloudApi(this).clearRemoteConfigCache()
@@ -360,7 +363,9 @@ class CloudMineActivity : AppCompatActivity() {
             addView(TextView(this@CloudMineActivity).apply {
                 text = title; textSize = 15f; setTextColor(cloudColor("#212121")); if (emphasized) setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, -2, 1f))
-            addView(TextView(this@CloudMineActivity).apply { text = "›"; textSize = 25f; setTextColor(cloudColor("#9E9E9E")); gravity = Gravity.CENTER })
+            addView(ImageView(this@CloudMineActivity).apply {
+                setImageResource(R.drawable.cloud_chevron_right); setColorFilter(cloudColor("#9E9E9E")); scaleType = ImageView.ScaleType.CENTER
+            }, LinearLayout.LayoutParams(dp(22), dp(50)))
         }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(50)).apply { if (emphasized) bottomMargin = dp(12) } }
 
     private fun maskEmail(value: String): String {
