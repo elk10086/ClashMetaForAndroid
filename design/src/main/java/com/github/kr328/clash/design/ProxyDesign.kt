@@ -121,7 +121,7 @@ class ProxyDesign(
                         ProxyAdapter(
                             config = config,
                             clicked = { name -> requests.trySend(Request.Select(index, name)) },
-                            notSelectableClicked = { showSelectableGroupTips(groupNames) },
+                            notSelectableClicked = { showSelectableGroupTips(groupNames[index], groupNames) },
                         )
                     }
                 ) {
@@ -163,13 +163,14 @@ class ProxyDesign(
         updateUrlTestButtonStatus()
     }
 
-    private fun showSelectableGroupTips(groupNames: List<String>) {
+    private fun showSelectableGroupTips(currentGroup: String, groupNames: List<String>) {
         val available = groupNames.filterIndexed { index, _ -> selectableGroups[index] }
         val message = if (available.isEmpty()) {
-            context.getString(R.string.cloud_proxy_group_no_selectable_tips)
+            context.getString(R.string.cloud_proxy_group_no_selectable_tips, currentGroup)
         } else {
             context.getString(
                 R.string.cloud_proxy_group_not_selectable_tips,
+                currentGroup,
                 available.joinToString("、"),
             )
         }
