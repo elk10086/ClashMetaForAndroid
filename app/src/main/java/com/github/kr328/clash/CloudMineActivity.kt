@@ -728,8 +728,8 @@ class CloudBusinessActivity : AppCompatActivity() {
             else -> null
         } ?: return addText("商品详情加载失败", 14f, "#B00020")
         val periods = listOf(
-            "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
-            "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付", "onetime_price" to "一次性",
+            "onetime_price" to "一次性", "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
+            "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付",
         ).filter { planPrice(plan, it.first) > 0 }
         if (periods.isEmpty()) return addText("该商品暂无可购买周期")
 
@@ -756,7 +756,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             addView(planContentWebView(plan.optString("content")))
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
-        content.addView(TextView(this).apply { text = "选择周期"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(8), 0, dp(10)) })
+        if (periods.size > 1) content.addView(TextView(this).apply { text = "选择周期"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(8), 0, dp(10)) })
         val chips = GridLayout(this).apply { columnCount = 3 }
         fun redrawChips() {
             chips.removeAllViews()
@@ -775,9 +775,12 @@ class CloudBusinessActivity : AppCompatActivity() {
                 })
             }
         }
-        redrawChips(); content.addView(chips)
+        if (periods.size > 1) { redrawChips(); content.addView(chips) }
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(8), 0, dp(8))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "优惠码"; textSize = 14f; setTextColor(cloudColor("#212121")); gravity = Gravity.CENTER_VERTICAL
+            }, LinearLayout.LayoutParams(dp(62), dp(48)))
             addView(coupon, LinearLayout.LayoutParams(0, dp(48), 1f))
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "验证"; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 12); isClickable = true
@@ -970,24 +973,38 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun renderInvite(summary: JSONObject, details: JSONObject, info: JSONObject) {
         val data = summary.optJSONObject("data")
-        val user = info.optJSONObject("data")
-        addText("我的返利", 16f, "#212121")
         val stats = data?.optJSONArray("stat") ?: JSONArray()
-        val statRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; background = roundedCard() }
+        fun heading(value: String) = TextView(this).apply {
+            text = value; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.START; setPadding(0, dp(8), 0, dp(10))
+        }
+        content.addView(heading("我的返利"))
+        val commission = if (stats.length() > 4) stats.optLong(4) else info.optJSONObject("data")?.optLong("commission_balance", 0) ?: 0
+        val statCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(10), dp(10), dp(10)); background = roundedCard()
+        }
+        val statRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         listOf("邀请用户", "可提现佣金", "确认中佣金", "佣金比例").forEachIndexed { index, label ->
-            val raw = if (index < stats.length()) stats.optDouble(index, 0.0) else if (index == 1) (user?.optDouble("commission_balance", 0.0) ?: 0.0) else 0.0
+            val raw = when (index) { 1 -> commission.toDouble(); else -> if (index < stats.length()) stats.optDouble(index, 0.0) else 0.0 }
             statRow.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
                 addView(TextView(this@CloudBusinessActivity).apply { text = if (index == 3) "${raw.toInt()}%" else if (index == 0) raw.toInt().toString() else String.format(java.util.Locale.US, "%.2f", raw / 100.0); textSize = 14f; setTextColor(cloudColor("#212121")) })
-                addView(TextView(this@CloudBusinessActivity).apply { text = label; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(4), 0, 0) })
+                addView(TextView(this@CloudBusinessActivity).apply { text = label; textSize = 14f; setTextColor(cloudColor("#212121")); setPadding(0, dp(4), 0, 0) })
             }, LinearLayout.LayoutParams(0, dp(76), 1f))
         }
-        content.addView(statRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10); bottomMargin = dp(20) })
-        val commission = user?.optLong("commission_balance", 0) ?: 0
-        if (commission > 0) content.addView(actionButton("提现到余额", true) { confirmCommissionTransfer(commission) }, LinearLayout.LayoutParams(dp(120), dp(40)).apply { gravity = Gravity.END; bottomMargin = dp(18) })
-        addText("我的邀请码", 16f, "#212121")
+        statCard.addView(statRow)
+        if (commission > 0) statCard.addView(actionButton("提现到余额", true) { confirmCommissionTransfer(commission) }, LinearLayout.LayoutParams(dp(110), dp(38)).apply { gravity = Gravity.END; topMargin = dp(6) })
+        content.addView(statCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        content.addView(heading("我的邀请码"))
         val codes = data?.optJSONArray("codes") ?: data?.optJSONArray("code")
-        val inviteCode = data?.optString("invite_code").orEmpty().ifBlank { codes?.optJSONObject(0)?.optString("code").orEmpty() }
+        var newestCode = ""
+        var newestTime = Long.MIN_VALUE
+        if (codes != null) repeat(codes.length()) { index ->
+            val item = codes.optJSONObject(index) ?: return@repeat
+            val time = item.optLong("updated_at", item.optLong("created_at"))
+            if (item.optString("code").isNotBlank() && time >= newestTime) { newestTime = time; newestCode = item.optString("code") }
+        }
+        val inviteCode = data?.optString("invite_code").orEmpty().ifBlank { newestCode }
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(10)); background = roundedCard()
             addView(TextView(this@CloudBusinessActivity).apply { text = inviteCode.ifBlank { "尚未生成" }; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
@@ -1001,14 +1018,35 @@ class CloudBusinessActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams(dp(112), dp(40)))
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(20) })
         val users = details.optJSONArray("data") ?: JSONArray()
-        addText("邀请返佣明细 · 共 ${users.length()} 笔", 15f, "#212121")
+        content.addView(heading("邀请返佣明细"))
+        val records = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(14), dp(14), dp(14)); background = roundedCard()
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(TextView(this@CloudBusinessActivity).apply { text = "返佣记录"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#212121")) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(TextView(this@CloudBusinessActivity).apply { text = "共 ${users.length()} 笔"; textSize = 12f; setTextColor(cloudColor("#757575")) })
+            })
+        }
+        if (users.length() == 0) records.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(0, dp(34), 0, dp(34))
+            addView(TextView(this@CloudBusinessActivity).apply { text = "▤"; textSize = 40f; setTextColor(cloudColor("#9E9E9E")); gravity = Gravity.CENTER })
+            addView(TextView(this@CloudBusinessActivity).apply { text = "暂无返佣明细"; textSize = 14f; setTextColor(cloudColor("#757575")); gravity = Gravity.CENTER })
+            addView(TextView(this@CloudBusinessActivity).apply { text = "好友购买套餐后，返佣记录会显示在这里"; textSize = 12f; setTextColor(cloudColor("#757575")); gravity = Gravity.CENTER; setPadding(0, dp(4), 0, 0) })
+        })
         repeat(users.length()) { index ->
             val invited = users.optJSONObject(index) ?: return@repeat
-            addCard(
-                "返利订单 ${invited.optString("trade_no", "-")}",
-                "订单金额：¥${money(invited.optLong("order_amount"))}\n获得佣金：¥${money(invited.optLong("get_amount"))}\n时间：${formatTimestamp(invited.optLong("created_at"))}",
-            ) {}
+            records.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12), dp(12), dp(12), dp(12)); background = rounded("#EEEEEE", 14)
+                addView(TextView(this@CloudBusinessActivity).apply { text = "￥"; textSize = 18f; gravity = Gravity.CENTER; setTextColor(cloudSelectedTextColor()); background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(cloudSelectedContainerColor()) } }, LinearLayout.LayoutParams(dp(38), dp(38)))
+                addView(LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0)
+                    addView(TextView(this@CloudBusinessActivity).apply { text = "返佣到账"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(cloudColor("#212121")) })
+                    addView(TextView(this@CloudBusinessActivity).apply { text = formatTimestamp(invited.optLong("created_at")); textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(3), 0, 0) })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(TextView(this@CloudBusinessActivity).apply { text = "+￥${money(invited.optLong("get_amount"))}"; textSize = 14f; setTypeface(typeface, Typeface.BOLD); setTextColor(Color.parseColor("#2E9D57")) })
+            }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
         }
+        content.addView(records)
     }
 
     private fun confirmCommissionTransfer(amount: Long) {
@@ -1019,14 +1057,11 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     private fun renderTickets(json: JSONObject) {
-        content.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            addView(TextView(this@CloudBusinessActivity).apply { text = "问题与反馈"; textSize = 17f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD) }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
-            addView(TextView(this@CloudBusinessActivity).apply {
-                text = "+ 创建工单"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 18); isClickable = true
-                setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_create")) }
-            }, LinearLayout.LayoutParams(dp(122), dp(40)))
-        }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
+        pageRoot.addView(TextView(this).apply {
+            text = "+  创建工单"; textSize = 14f; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor())
+            background = rounded("#212121", 24); elevation = dp(6).toFloat(); isClickable = true
+            setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_create")) }
+        }, LinearLayout.LayoutParams(dp(128), dp(48)).apply { gravity = Gravity.END; marginEnd = dp(16); bottomMargin = dp(16) })
         val list = json.optJSONArray("data") ?: JSONArray()
         if (list.length() == 0) {
             addText("◌", 38f, "#9E9E9E")
@@ -1036,16 +1071,16 @@ class CloudBusinessActivity : AppCompatActivity() {
         repeat(list.length()) { i ->
             val item = list.optJSONObject(i) ?: return@repeat
             val level = when (item.optInt("level")) { 0 -> "低"; 2 -> "高"; else -> "中" }
-            val state = if (item.optInt("status") == 0) "处理中" else "已关闭"
+            val closed = item.optInt("status") == 1
+            val state = if (closed) "已关闭" else if (item.optInt("reply_status") == 1) "等待回复" else "已回复"
             content.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(15), dp(13), dp(10), dp(13)); background = roundedCard(); isClickable = true
                 setOnClickListener { startActivity(Intent(this@CloudBusinessActivity, CloudBusinessActivity::class.java).putExtra("type", "ticket_detail").putExtra("ticket_id", item.optString("id"))) }
                 addView(LinearLayout(this@CloudBusinessActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     addView(TextView(this@CloudBusinessActivity).apply { text = item.optString("subject", "工单 #${item.optString("id")}"); textSize = 15f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 2 })
-                    addView(TextView(this@CloudBusinessActivity).apply { text = "${level}优先级 · ${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}"; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(7), 0, 0) })
+                    addView(TextView(this@CloudBusinessActivity).apply { text = "$level · $state\n${formatTimestamp(item.optLong("updated_at", item.optLong("created_at")))}"; textSize = 12f; setTextColor(cloudColor("#757575")); setPadding(0, dp(6), 0, 0) })
                 }, LinearLayout.LayoutParams(0, -2, 1f))
-                addView(TextView(this@CloudBusinessActivity).apply { text = state; textSize = 12f; gravity = Gravity.CENTER; setTextColor(cloudColor(if (item.optInt("status") == 0) "#B45309" else "#757575")); background = rounded(if (item.optInt("status") == 0) "#FFF3E0" else "#EEEEEE", 99); setPadding(dp(9), dp(4), dp(9), dp(4)) })
                 addView(TextView(this@CloudBusinessActivity).apply { text = "›"; textSize = 24f; setTextColor(cloudColor("#9E9E9E")); gravity = Gravity.CENTER }, LinearLayout.LayoutParams(dp(30), dp(42)))
             }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
         }
@@ -1065,7 +1100,9 @@ class CloudBusinessActivity : AppCompatActivity() {
             val message = messages.optJSONObject(index) ?: return@repeat
             val mine = message.optBoolean("is_me")
             content.addView(LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(10), dp(12), dp(8)); background = rounded(if (mine) "#E5E5E5" else "#FFFFFF", 12, "#E0E0E0")
+                orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(10), dp(12), dp(8)); background = if (mine) GradientDrawable().apply {
+                    setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat()
+                } else rounded("#EEEEEE", 12)
                 addView(TextView(this@CloudBusinessActivity).apply { text = message.optString("message"); textSize = 14f; setTextColor(cloudColor("#212121")) })
                 addView(TextView(this@CloudBusinessActivity).apply { text = formatTimestamp(message.optLong("created_at")); textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(5), 0, 0) })
             }, LinearLayout.LayoutParams((resources.displayMetrics.widthPixels * 0.78f).toInt(), -2).apply { gravity = if (mine) Gravity.END else Gravity.START; bottomMargin = dp(10) })
@@ -1090,7 +1127,7 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     private fun renderTicketCreate() {
-        val subject = EditText(this).apply { hint = "请输入工单主题"; isSingleLine = true; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), 0, dp(12), 0) }
+        val subject = EditText(this).apply { hint = "补充工单主题"; isSingleLine = true; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), 0, dp(12), 0) }
         val message = EditText(this).apply { hint = "请详细描述遇到的问题"; minLines = 6; gravity = Gravity.TOP; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(12), dp(12), dp(12)) }
         var level = 1
         val levels = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -1098,8 +1135,9 @@ class CloudBusinessActivity : AppCompatActivity() {
             levels.removeAllViews()
             listOf("低", "中", "高").forEachIndexed { index, label ->
                 levels.addView(TextView(this).apply {
-                    text = label; gravity = Gravity.CENTER; textSize = 14f; isClickable = true; setTextColor(cloudColor("#212121"))
-                    background = rounded(if (level == index) "#E5E5E5" else "#FFFFFF", 12, if (level == index) "#212121" else "#D5D5D5")
+                    text = label; gravity = Gravity.CENTER; textSize = 14f; isClickable = true
+                    setTextColor(if (level == index) cloudSelectedTextColor() else cloudColor("#212121"))
+                    background = if (level == index) GradientDrawable().apply { setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat() } else rounded("#FFFFFF", 12, "#D5D5D5")
                     setOnClickListener { level = index; redraw() }
                 }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { if (index > 0) marginStart = dp(8) })
             }
@@ -1111,7 +1149,8 @@ class CloudBusinessActivity : AppCompatActivity() {
         content.addView(TextView(this).apply {
             text = "提交工单"; gravity = Gravity.CENTER; textSize = 15f; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 22); isClickable = true
             setOnClickListener {
-                val title = subject.text.toString().trim(); val body = message.text.toString().trim()
+                val suffix = subject.text.toString().trim(); val body = message.text.toString().trim()
+                val title = "[Android ${BuildConfig.VERSION_NAME}]${if (suffix.isBlank()) "" else " $suffix"}"
                 if (title.isBlank() || body.isBlank()) toast(IllegalArgumentException("请填写完整的主题和问题描述"))
                 else lifecycleScope.launch { runCatching { api.createTicket(title, level, body) }.onSuccess {
                     Toast.makeText(this@CloudBusinessActivity, "工单已提交", Toast.LENGTH_SHORT).show()
