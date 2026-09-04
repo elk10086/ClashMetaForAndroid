@@ -286,6 +286,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                 used = json.optLong("used"),
                 total = json.optLong("total"),
                 expiresAt = json.optLong("expires_at"),
+                balance = json.optLong("balance"),
             )
         }.getOrNull()
     }
@@ -300,6 +301,7 @@ class MainActivity : BaseActivity<MainDesign>() {
             .put("used", subscription.used)
             .put("total", subscription.total)
             .put("expires_at", subscription.expiresAt)
+            .put("balance", subscription.balance)
         membershipCache.edit().putString("membership", json.toString()).apply()
     }
 

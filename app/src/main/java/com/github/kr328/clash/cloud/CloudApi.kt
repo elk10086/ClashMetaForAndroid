@@ -24,6 +24,7 @@ data class CloudSubscription(
     val used: Long,
     val total: Long,
     val expiresAt: Long,
+    val balance: Long,
 )
 
 class CloudApi(private val context: Context) {
@@ -72,6 +73,7 @@ class CloudApi(private val context: Context) {
             used = data.optLong("u") + data.optLong("d"),
             total = data.optLong("transfer_enable"),
             expiresAt = data.optLong("expired_at"),
+            balance = data.optLong("balance"),
         ).also { if (it.subscribeUrl.isBlank()) throw CloudException("订阅地址为空") }
     }
 

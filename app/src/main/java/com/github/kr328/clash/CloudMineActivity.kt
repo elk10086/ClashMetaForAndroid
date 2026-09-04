@@ -189,6 +189,7 @@ private fun Context.applyCloudTypography(view: View) {
 
 class CloudMineActivity : AppCompatActivity() {
     private lateinit var expiryView: TextView
+    private lateinit var balanceView: TextView
     private lateinit var accountView: TextView
     private var appliedThemeSignature = ""
 
@@ -211,29 +212,25 @@ class CloudMineActivity : AppCompatActivity() {
                 }
                 addView(accountView, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
             })
+            addView(sectionTitle("会员信息"))
             addView(vipBanner())
-            addView(actionRow("检查更新", emphasized = true, leadingIcon = DesignR.drawable.ic_outline_update) {
-                lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
-            })
-            addView(actionRow("我的订单") { open("orders") })
-            addView(actionRow("邀请返利") { open("invite") })
-            addView(actionRow("意见反馈") { open("tickets") })
-            addView(actionRow("线上客服", customer = true) {
-                lifecycleScope.launch {
-                    runCatching { CloudReleaseManager.customerServiceUrl(this@CloudMineActivity) }
-                        .onSuccess { url -> if (url.startsWith("http")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) else toast(IllegalStateException("客服地址不可用")) }
-                        .onFailure { toast(it) }
-                }
-            })
-            addView(actionRow("清除远端缓存") { confirmRefreshServiceConfig() })
-            addView(actionRow("主题") {
-                startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java))
-            })
-            addView(actionRow("一键换肤") { open("skin") })
-            addView(actionRow("设置") {
-                startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java))
-            })
-            addView(View(this@CloudMineActivity), LinearLayout.LayoutParams(1, dp(24)))
+            addView(sectionTitle("账号与服务"))
+            addView(sectionCard(
+                actionRow("我的订单") { open("orders") },
+                actionRow("邀请返利") { open("invite") },
+                actionRow("意见反馈") { open("tickets") },
+            ))
+            addView(sectionTitle("应用设置"))
+            addView(sectionCard(
+                actionRow("检查更新", leadingIcon = DesignR.drawable.ic_outline_update) {
+                    lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
+                },
+                actionRow("清除远端缓存") { confirmRefreshServiceConfig() },
+                actionRow("主题") { startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java)) },
+                actionRow("一键换肤") { open("skin") },
+                actionRow("设置") { startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java)) },
+            ))
+            addView(sectionTitle("账号安全"))
             addView(logoutButton())
         }
         setContentView(vertical().apply {
@@ -254,6 +251,7 @@ class CloudMineActivity : AppCompatActivity() {
                         .format(java.util.Date(subscription.expiresAt * 1000))
                 } else "不限时长"
                 expiryView.text = "到期时间：$text"
+                balanceView.text = "钱包余额：¥${formatBalance(subscription.balance)}"
             }
         }
     }
@@ -341,13 +339,38 @@ class CloudMineActivity : AppCompatActivity() {
             addView(TextView(this@CloudMineActivity).apply { text = "VIP会员"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL) })
             expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
             addView(expiryView)
+            balanceView = TextView(this@CloudMineActivity).apply { text = "钱包余额：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
+            addView(balanceView)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-    }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(77)).apply { topMargin = dp(17); bottomMargin = dp(20) } }
+    }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(88)).apply { bottomMargin = dp(2) } }
 
-    private fun actionRow(title: String, emphasized: Boolean = false, customer: Boolean = false, leadingIcon: Int? = null, click: () -> Unit): View =
+    private fun sectionTitle(title: String) = TextView(this).apply {
+        text = title
+        textSize = 13f
+        setTextColor(cloudColor("#757575"))
+        setTypeface(typeface, Typeface.BOLD)
+        gravity = Gravity.CENTER_VERTICAL
+    }.also {
+        it.layoutParams = LinearLayout.LayoutParams(-1, dp(34)).apply {
+            topMargin = dp(10)
+            marginStart = dp(4)
+        }
+    }
+
+    private fun sectionCard(vararg rows: View) = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = roundRect("#FFFFFF", 10, "#E0E0E0")
+        rows.forEachIndexed { index, row ->
+            if (index > 0) addView(View(this@CloudMineActivity).apply {
+                setBackgroundColor(cloudColor("#E0E0E0"))
+            }, LinearLayout.LayoutParams(-1, dp(1)).apply { marginStart = dp(12); marginEnd = dp(12) })
+            addView(row)
+        }
+    }
+
+    private fun actionRow(title: String, leadingIcon: Int? = null, click: () -> Unit): View =
         LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-            if (emphasized) background = roundRect("#FFFFFF", 10, "#E0E0E0")
             setPadding(dp(12), 0, dp(8), 0)
             isClickable = true
             isFocusable = true
@@ -356,23 +379,18 @@ class CloudMineActivity : AppCompatActivity() {
                 foreground = if (focused) roundRect("#00000000", 12, "#212121") else null
             }
             setOnClickListener { click() }
-            if (customer) addView(ImageView(this@CloudMineActivity).apply {
-                setImageResource(R.drawable.cloud_headset); setColorFilter(cloudButtonTextColor()); setPadding(dp(8), dp(8), dp(8), dp(8))
-                background = GradientDrawable(
-                    GradientDrawable.Orientation.TL_BR,
-                    intArrayOf(cloudPrimaryColor(), cloudSecondaryColor()),
-                ).apply { shape = GradientDrawable.OVAL }
-            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) })
-            else if (leadingIcon != null) addView(ImageView(this@CloudMineActivity).apply {
+            if (leadingIcon != null) addView(ImageView(this@CloudMineActivity).apply {
                 setImageResource(leadingIcon); setColorFilter(cloudPrimaryColor()); setPadding(dp(8), dp(8), dp(8), dp(8))
             }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(2) })
             addView(TextView(this@CloudMineActivity).apply {
-                text = title; textSize = 15f; setTextColor(cloudColor("#212121")); if (emphasized) setTypeface(typeface, Typeface.BOLD)
+                text = title; textSize = 15f; setTextColor(cloudColor("#212121"))
             }, LinearLayout.LayoutParams(0, -2, 1f))
             addView(ImageView(this@CloudMineActivity).apply {
                 setImageResource(R.drawable.cloud_chevron_right); setColorFilter(cloudColor("#9E9E9E")); scaleType = ImageView.ScaleType.CENTER
             }, LinearLayout.LayoutParams(dp(22), dp(50)))
-        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(50)).apply { if (emphasized) bottomMargin = dp(12) } }
+        }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(50)) }
+
+    private fun formatBalance(cents: Long) = String.format(java.util.Locale.US, "%.2f", cents / 100.0)
 
     private fun maskEmail(value: String): String {
         val parts = value.split('@')
