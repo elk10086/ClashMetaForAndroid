@@ -129,10 +129,18 @@ class CloudAuthActivity : AppCompatActivity() {
                     } else lastBrandTapAt = now
                 }
             })
-            addView(link("防失联：${BuildConfig.BRAND_OFFICIAL_SITE_HOST}", underline = true, bold = false) {
-                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.BRAND_OFFICIAL_SITE_URL))) }
+            var officialSiteUrl = BuildConfig.BRAND_OFFICIAL_SITE_URL
+            val officialSiteLink = link("防失联：${BuildConfig.BRAND_OFFICIAL_SITE_HOST}", underline = true, bold = false) {
+                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(officialSiteUrl))) }
                     .onFailure { toast(getString(DesignR.string.cloud_operation_failed)) }
-            }, LinearLayout.LayoutParams(-2, dp(40)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            }
+            addView(officialSiteLink, LinearLayout.LayoutParams(-2, dp(40)).apply { gravity = Gravity.CENTER_HORIZONTAL })
+            lifecycleScope.launch {
+                officialSiteUrl = runCatching { CloudReleaseManager.officialSiteUrl(this@CloudAuthActivity) }
+                    .getOrDefault(BuildConfig.BRAND_OFFICIAL_SITE_URL)
+                val host = runCatching { Uri.parse(officialSiteUrl).host }.getOrNull().orEmpty()
+                officialSiteLink.text = "防失联：${host.ifBlank { BuildConfig.BRAND_OFFICIAL_SITE_HOST }}"
+            }
             addSpace(34); addView(mail); addSpace(18); addView(password); addSpace(40)
             addView(primaryButton(getString(DesignR.string.cloud_auth_login), login = true) {
                 runBusy {

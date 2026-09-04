@@ -36,6 +36,22 @@ object CloudReleaseManager {
         return data.optString("customerServiceUrl", data.optString("customer_service_url"))
     }
 
+    /** The login "anti-loss" link follows free_time_new: remote img_url first, brand site fallback. */
+    suspend fun officialSiteUrl(context: Context): String {
+        val raw = CloudApi(context).remoteConfig().optJSONObject("data")
+            ?.optString("img_url")
+            ?.trim()
+            .orEmpty()
+        if (raw.isBlank()) return BuildConfig.BRAND_OFFICIAL_SITE_URL
+        val normalized = if (raw.contains("://")) raw else "https://$raw"
+        val uri = runCatching { Uri.parse(normalized) }.getOrNull()
+        return if (uri != null && uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank()) {
+            normalized
+        } else {
+            BuildConfig.BRAND_OFFICIAL_SITE_URL
+        }
+    }
+
     private fun showAnnouncement(activity: AppCompatActivity, data: JSONObject, automatic: Boolean) {
         if (automatic && data.optInt("show", 0) != 1) return
         val title = data.optString("title").trim()
