@@ -402,8 +402,11 @@ class CloudMineActivity : AppCompatActivity() {
         rows.forEachIndexed { index, row ->
             if (index > 0) addView(View(this@CloudMineActivity).apply {
                 setBackgroundColor(cloudColor("#E0E0E0"))
-                alpha = .72f
-            }, LinearLayout.LayoutParams(-1, dp(1)))
+                alpha = .6f
+            }, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                marginStart = dp(72)
+                marginEnd = dp(16)
+            })
             addView(row)
         }
     }
