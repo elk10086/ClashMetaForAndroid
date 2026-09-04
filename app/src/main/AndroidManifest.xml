@@ -60,6 +60,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name=".StartupActivity"
+            android:exported="true"
+            android:screenOrientation="unspecified"
+            android:theme="@style/StartupTheme" />
+        <activity
             android:name=".CloudAuthActivity"
             android:configChanges="uiMode"
             android:exported="false"
@@ -69,7 +74,7 @@
         <activity-alias
             android:name=".MainActivityAlias"
             android:exported="true"
-            android:targetActivity=".MainActivity">
+            android:targetActivity=".StartupActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

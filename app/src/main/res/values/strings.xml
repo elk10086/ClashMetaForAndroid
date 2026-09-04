@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="splash_starting">Starting…</string>
+    <string name="splash_welcome_brand">Welcome to %1$s</string>
+    <string name="splash_slogan">Good morning, good afternoon, and good evening!</string>
+</resources>
