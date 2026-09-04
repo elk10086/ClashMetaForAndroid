@@ -214,7 +214,7 @@ class MainActivity : BaseActivity<MainDesign>() {
             )
             subscription == null -> setCloudAccount(
                 getString(DesignR.string.cloud_membership_loading),
-                session.email,
+                "",
                 "",
                 0,
             )
