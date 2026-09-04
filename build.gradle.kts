@@ -3,6 +3,8 @@
 import com.android.build.gradle.AppExtension
 import com.android.build.gradle.BaseExtension
 import java.net.URL
+import java.security.KeyStore
+import java.security.MessageDigest
 import java.util.*
 
 buildscript {
@@ -189,18 +191,51 @@ subprojects {
             }
         }
 
-        signingConfigs {
-            val keystore = rootProject.file("signing.properties")
-            if (keystore.exists()) {
-                create("release") {
-                    val prop = Properties().apply {
-                        keystore.inputStream().use(this::load)
-                    }
+        val releaseKeystore = rootProject.file("release.keystore")
+        val signingProperties = Properties().apply {
+            val dedicated = rootProject.file("signing.properties")
+            val local = rootProject.file("local.properties")
+            when {
+                dedicated.exists() -> dedicated.inputStream().use(::load)
+                local.exists() -> local.inputStream().use(::load)
+            }
+        }
+        val releaseStorePassword = signingProperties.getProperty("keystore.password")
+            ?: signingProperties.getProperty("storePassword")
+        val releaseKeyAlias = signingProperties.getProperty("key.alias")
+            ?: signingProperties.getProperty("keyAlias")
+        val releaseKeyPassword = signingProperties.getProperty("key.password")
+            ?: signingProperties.getProperty("keyPassword")
+        val hasReleaseSigning = releaseKeystore.exists() &&
+            !releaseStorePassword.isNullOrBlank() &&
+            !releaseKeyAlias.isNullOrBlank() &&
+            !releaseKeyPassword.isNullOrBlank()
+        val releaseRequested = gradle.startParameter.taskNames.any {
+            it.contains("release", ignoreCase = true)
+        }
+        if (isApp && releaseRequested) {
+            check(hasReleaseSigning) {
+                "Android release signing credentials are missing. Refusing to use the debug certificate."
+            }
+            val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+            releaseKeystore.inputStream().use { keyStore.load(it, releaseStorePassword!!.toCharArray()) }
+            val certificate = keyStore.getCertificate(releaseKeyAlias)
+                ?: error("Android release signing alias '$releaseKeyAlias' was not found")
+            val actualSha256 = MessageDigest.getInstance("SHA-256")
+                .digest(certificate.encoded)
+                .joinToString("") { "%02X".format(it) }
+            check(actualSha256 == "6F431690613AE76C2F8FF5DE0AE9656F0623CE528F3F107B2AB5A005D0ED75ED") {
+                "Android release signing certificate does not match free_time_new."
+            }
+        }
 
-                    storeFile = rootProject.file("release.keystore")
-                    storePassword = prop.getProperty("keystore.password")!!
-                    keyAlias = prop.getProperty("key.alias")!!
-                    keyPassword = prop.getProperty("key.password")!!
+        signingConfigs {
+            if (hasReleaseSigning) {
+                create("release") {
+                    storeFile = releaseKeystore
+                    storePassword = releaseStorePassword
+                    keyAlias = releaseKeyAlias
+                    keyPassword = releaseKeyPassword
                 }
             }
         }
