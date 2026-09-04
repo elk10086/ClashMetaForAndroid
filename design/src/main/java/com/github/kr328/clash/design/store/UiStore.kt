@@ -29,8 +29,13 @@ class UiStore(context: Context) {
 
     var cloudThemeStyle: Int by store.int(
         key = "cloud_theme_style",
-        defaultValue = -1,
+        defaultValue = 0,
     )
+
+    init {
+        // The original theme remains implemented for compatibility, but is no longer user-facing.
+        if (cloudThemeStyle !in 0..3) cloudThemeStyle = 0
+    }
 
     var pureBlack: Boolean by store.boolean(
         key = "pure_black",

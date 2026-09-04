@@ -463,7 +463,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             Triple(2, "♂", "男神风"),
             Triple(3, "★", "二次元"),
         )
-        val styleNames = mapOf(-1 to "原生主题", 0 to "极简风", 1 to "公主风", 2 to "男神风", 3 to "二次元")
+        val styleNames = mapOf(0 to "极简风", 1 to "公主风", 2 to "男神风", 3 to "二次元")
         fun sectionTitle(icon: String, title: String, action: String? = null, onAction: (() -> Unit)? = null) {
             content.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
@@ -498,7 +498,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             })
         }
 
-        sectionTitle("▣", "主题预览", if (store.cloudThemeStyle >= 0) "重置" else null) { selectStyle(-1) }
+        sectionTitle("▣", "主题预览", if (store.cloudThemeStyle != 0) "重置" else null) { selectStyle(0) }
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(14), dp(14), dp(14), dp(14)); background = roundedCard()
@@ -512,11 +512,11 @@ class CloudBusinessActivity : AppCompatActivity() {
             })
             addView(TextView(this@CloudBusinessActivity).apply {
                 val mode = when (store.darkMode) { DarkMode.Auto -> "自动"; DarkMode.ForceLight -> "浅色"; DarkMode.ForceDark -> "深色" }
-                text = "$mode   ${styleNames[store.cloudThemeStyle]}   ${if (store.pureBlack) "纯黑" else "标准"}"
+                text = "$mode   ${styleNames[store.cloudThemeStyle] ?: "极简风"}   ${if (store.pureBlack) "纯黑" else "标准"}"
                 textSize = 12f; setTextColor(cloudSelectedTextColor()); setPadding(0, dp(10), 0, 0)
             })
             addView(TextView(this@CloudBusinessActivity).apply {
-                text = "字体风格：${listOf("系统字体", "Zen Maru Gothic", "Barlow Condensed", "Raleway", "ZCOOL KuaiLe")[store.cloudThemeStyle + 1]}"
+                text = "字体风格：${listOf("Zen Maru Gothic", "Barlow Condensed", "Raleway", "ZCOOL KuaiLe")[store.cloudThemeStyle.coerceIn(0, 3)]}"
                 textSize = 14f; setTextColor(cloudPrimaryColor()); setTypeface(typeface, Typeface.BOLD); setPadding(0, dp(12), 0, dp(2))
             })
             addView(TextView(this@CloudBusinessActivity).apply {
