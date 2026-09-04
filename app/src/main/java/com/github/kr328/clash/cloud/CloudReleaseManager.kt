@@ -51,11 +51,11 @@ object CloudReleaseManager {
 
     suspend fun showAnnouncement(activity: AppCompatActivity, automatic: Boolean = false) {
         val data = announcementData(activity) ?: return
-        showAnnouncement(activity, data, automatic, openLink = true)
+        showAnnouncement(activity, data, automatic)
     }
 
     fun showLoginAnnouncement(activity: AppCompatActivity, data: JSONObject, automatic: Boolean = false) =
-        showAnnouncement(activity, data, automatic, openLink = true)
+        showAnnouncement(activity, data, automatic)
 
     fun isDashboardAnnouncementUnread(context: Context, data: JSONObject): Boolean {
         val show = data.optInt("show", 0)
@@ -72,7 +72,7 @@ object CloudReleaseManager {
         }
 
     fun showDashboardAnnouncement(activity: AppCompatActivity, data: JSONObject, onRead: () -> Unit) {
-        showAnnouncement(activity, data, automatic = false, openLink = false) {
+        showAnnouncement(activity, data, automatic = false) {
             if (data.optInt("show", 0) !in 1..2) return@showAnnouncement
             activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putBoolean("dashboard_announcement_read_${announcementSignature(data)}", true)
@@ -127,7 +127,6 @@ object CloudReleaseManager {
         activity: AppCompatActivity,
         data: JSONObject,
         automatic: Boolean,
-        openLink: Boolean,
         onDismiss: (() -> Unit)? = null,
     ) {
         val show = data.optInt("show", 0)
@@ -142,21 +141,11 @@ object CloudReleaseManager {
                 activity = activity,
                 title = title.ifBlank { "公告" },
                 content = content,
-                primaryLabel = if (openLink) data.optString("btnTitle").ifBlank { "关闭" } else "关闭",
                 closeDescription = "关闭公告",
                 showClose = true,
                 cancelable = true,
                 onDismiss = onDismiss,
-            ) {
-                if (!openLink) {
-                    true
-                } else {
-                    val target = resolveOfficialSiteUrl(data)
-                    runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
-                        .onFailure { Toast.makeText(activity, "无法打开公告链接", Toast.LENGTH_LONG).show() }
-                        .isSuccess
-                }
-            }
+            )
         }
     }
 
@@ -164,13 +153,13 @@ object CloudReleaseManager {
         activity: AppCompatActivity,
         title: String,
         content: String,
-        primaryLabel: String,
         closeDescription: String,
         showClose: Boolean,
         cancelable: Boolean,
+        primaryLabel: String? = null,
         secondaryLabel: String? = null,
         onDismiss: (() -> Unit)? = null,
-        onPrimary: () -> Boolean,
+        onPrimary: (() -> Boolean)? = null,
     ) {
         val density = activity.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
@@ -251,20 +240,25 @@ object CloudReleaseManager {
             insetBottom = 0
         }
 
-        val actions = LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val secondary = secondaryLabel?.let { label ->
-            actionButton(label, false).also {
-                actions.addView(it, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
+        var secondary: MaterialButton? = null
+        var primaryAction: MaterialButton? = null
+        if (primaryLabel != null && onPrimary != null) {
+            val actions = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
             }
+            secondary = secondaryLabel?.let { label ->
+                actionButton(label, false).also {
+                    actions.addView(it, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(5) })
+                }
+            }
+            val button = actionButton(primaryLabel, true)
+            primaryAction = button
+            actions.addView(button, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
+                if (secondary != null) marginStart = dp(5)
+            })
+            root.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)).apply { topMargin = dp(22) })
         }
-        val primaryAction = actionButton(primaryLabel, true)
-        actions.addView(primaryAction, LinearLayout.LayoutParams(0, dp(48), 1f).apply {
-            if (secondary != null) marginStart = dp(5)
-        })
-        root.addView(actions, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)).apply { topMargin = dp(22) })
 
         val dialog = AlertDialog.Builder(activity)
             .setView(root, 0, 0, 0, 0)
@@ -274,7 +268,7 @@ object CloudReleaseManager {
         dialog.setOnDismissListener { onDismiss?.invoke() }
         close?.setOnClickListener { dialog.dismiss() }
         secondary?.setOnClickListener { dialog.dismiss() }
-        primaryAction.setOnClickListener { if (onPrimary()) dialog.dismiss() }
+        primaryAction?.setOnClickListener { if (onPrimary?.invoke() == true) dialog.dismiss() }
         dialog.setOnShowListener {
             val width = (activity.resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(480))
             dialog.window?.apply {
