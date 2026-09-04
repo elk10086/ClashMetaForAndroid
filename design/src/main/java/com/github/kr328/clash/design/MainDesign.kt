@@ -1,5 +1,8 @@
 package com.github.kr328.clash.design
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Typeface
@@ -9,6 +12,7 @@ import android.view.Gravity
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.TextView
+import android.view.animation.AccelerateDecelerateInterpolator
 import com.github.kr328.clash.core.model.TunnelState
 import com.github.kr328.clash.core.util.trafficTotal
 import com.github.kr328.clash.core.util.trafficUpload
@@ -36,6 +40,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
     private val binding = DesignMainBinding
         .inflate(context.layoutInflater, context.root, false)
     private var selectedMode: TunnelState.Mode = TunnelState.Mode.Rule
+    private var powerPulseAnimator: AnimatorSet? = null
 
     override val root: View
         get() = binding.root
@@ -49,6 +54,39 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
     suspend fun setClashRunning(running: Boolean) {
         withContext(Dispatchers.Main) {
             binding.clashRunning = running
+            binding.executePendingBindings()
+            updatePowerAnimation(running)
+        }
+    }
+
+    private fun updatePowerAnimation(running: Boolean) {
+        if (!running) {
+            powerPulseAnimator?.cancel()
+            powerPulseAnimator = null
+            binding.powerPulseView.apply {
+                alpha = 0f
+                scaleX = 1f
+                scaleY = 1f
+            }
+            return
+        }
+        if (powerPulseAnimator != null) return
+        val pulse = binding.powerPulseView
+        powerPulseAnimator = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(pulse, View.SCALE_X, 0.96f, 1.14f),
+                ObjectAnimator.ofFloat(pulse, View.SCALE_Y, 0.96f, 1.14f),
+                ObjectAnimator.ofFloat(pulse, View.ALPHA, 0.62f, 0f),
+            )
+            childAnimations.forEach {
+                (it as ValueAnimator).apply {
+                    duration = 1_500L
+                    repeatCount = ValueAnimator.INFINITE
+                    repeatMode = ValueAnimator.RESTART
+                    interpolator = AccelerateDecelerateInterpolator()
+                }
+            }
+            start()
         }
     }
 
@@ -119,6 +157,16 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.announcementTitle = ""
         binding.announcementVisible = false
         binding.announcementUnread = false
+        binding.powerPulseView.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(view: View) {
+                if (binding.clashRunning == true) updatePowerAnimation(true)
+            }
+
+            override fun onViewDetachedFromWindow(view: View) {
+                powerPulseAnimator?.cancel()
+                powerPulseAnimator = null
+            }
+        })
     }
 
     fun request(request: Request) {

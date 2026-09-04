@@ -187,18 +187,35 @@
                         android:progressDrawable="@drawable/cloud_usage_progress" />
                 </LinearLayout>
 
-                <ImageView
-                    android:layout_width="136dp"
-                    android:layout_height="136dp"
-                    android:layout_marginTop="24dp"
-                    android:background="@{clashRunning ? @drawable/cloud_power_active : @drawable/cloud_power_inactive}"
-                    android:contentDescription="@string/tap_to_start"
-                    android:focusable="true"
-                    android:defaultFocusHighlightEnabled="true"
-                    android:onClick="@{() -> self.request(Request.ToggleStatus)}"
-                    android:padding="44dp"
-                    android:src="@{clashRunning ? @drawable/cloud_pause : @drawable/cloud_play}"
-                    android:tint="?attr/colorControlNormal" />
+                <FrameLayout
+                    android:layout_width="152dp"
+                    android:layout_height="152dp"
+                    android:layout_marginTop="16dp"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
+                    <View
+                        android:id="@+id/powerPulseView"
+                        android:layout_width="132dp"
+                        android:layout_height="132dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/cloud_power_pulse"
+                        android:visibility="@{clashRunning ? View.VISIBLE : View.GONE}" />
+
+                    <ImageView
+                        android:id="@+id/powerButtonView"
+                        android:layout_width="136dp"
+                        android:layout_height="136dp"
+                        android:layout_gravity="center"
+                        android:background="@{clashRunning ? @drawable/cloud_power_active : @drawable/cloud_power_inactive}"
+                        android:contentDescription="@string/tap_to_start"
+                        android:focusable="true"
+                        android:defaultFocusHighlightEnabled="true"
+                        android:onClick="@{() -> self.request(Request.ToggleStatus)}"
+                        android:padding="44dp"
+                        android:src="@{clashRunning ? @drawable/cloud_pause : @drawable/cloud_play}"
+                        android:tint="?attr/colorControlNormal" />
+                </FrameLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
