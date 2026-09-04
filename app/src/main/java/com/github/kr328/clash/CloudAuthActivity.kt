@@ -88,6 +88,7 @@ class CloudAuthActivity : AppCompatActivity() {
             if (store.cloudTextScaleEnabled) {
                 view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
             }
+            if (!view.hint.isNullOrBlank()) view.setHintTextColor(secondary())
         }
         if (view is android.view.ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
     }

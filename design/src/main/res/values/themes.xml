@@ -17,6 +17,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
         <item name="colorOutline">#1A000000</item>
+        <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
 
@@ -41,6 +42,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
         <item name="colorOutline">#24FFFFFF</item>
+        <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
         <item name="android:windowBackground">@color/color_dark_background</item>
 
@@ -72,6 +74,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
         <item name="colorOutline">#1A000000</item>
+        <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
 
@@ -94,6 +97,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
         <item name="colorOutline">#24FFFFFF</item>
+        <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
 
         <item name="colorPrimaryDark">?attr/colorPrimary</item>
@@ -125,6 +129,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
         <item name="colorOutline">#1A000000</item>
+        <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
 
@@ -148,6 +153,7 @@
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
         <item name="colorOutline">#24FFFFFF</item>
+        <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlNormal">@android:color/white</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
 

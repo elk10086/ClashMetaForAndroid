@@ -122,6 +122,12 @@ private fun Context.cloudSecondaryColor(): Int = resolveThemedColor(com.google.a
 
 private fun Context.cloudOutlineColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorOutline)
 
+private fun Context.cloudHintColor(): Int = blendCloudColor(
+    resolveThemedColor(com.google.android.material.R.attr.colorOnSurface),
+    resolveThemedColor(com.google.android.material.R.attr.colorSurface),
+    .52f,
+)
+
 private fun Context.cloudErrorColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorError)
 
 private fun Context.cloudPriceChipColor(): Int = blendCloudColor(
@@ -189,6 +195,7 @@ private fun Context.applyCloudTypography(view: View) {
         if (store.cloudTextScaleEnabled) {
             view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
         }
+        if (!view.hint.isNullOrBlank()) view.setHintTextColor(cloudHintColor())
     }
     if (view is ViewGroup) repeat(view.childCount) { applyCloudTypography(view.getChildAt(it)) }
 }
@@ -882,7 +889,6 @@ class CloudBusinessActivity : AppCompatActivity() {
         val coupon = EditText(this).apply {
             hint = "请输入优惠码"; isSingleLine = true
             setTextColor(cloudColor("#212121")); setHintTextColor(cloudColor("#757575"))
-            typeface = Typeface.create("sans-serif-rounded", Typeface.NORMAL)
             background = rounded("#F5F5F5", 12, "#E0E0E0")
             setPadding(dp(13), 0, dp(13), 0)
         }
@@ -1535,11 +1541,13 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun showTicketCreateSheet() {
         val dialog = BottomSheetDialog(this)
+        val form = ticketCreateForm {
+            dialog.dismiss()
+            recreate()
+        }
+        applyCloudTypography(form)
         val scroll = ScrollView(this).apply {
-            addView(ticketCreateForm {
-                dialog.dismiss()
-                recreate()
-            })
+            addView(form)
         }
         dialog.setContentView(scroll)
         dialog.show()
