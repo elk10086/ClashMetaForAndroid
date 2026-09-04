@@ -179,15 +179,19 @@ class MainActivity : BaseActivity<MainDesign>() {
         }
         setMode(state.mode)
 
-        if (clashRunning || previewCoreRunning) {
-            val line = withClash {
-                val names = queryProxyGroupNames(uiStore.proxyExcludeNotSelectable)
-                names.firstOrNull()?.let { queryProxyGroup(it, uiStore.proxySort).now }
-            }
-            setLineName(line?.takeIf { it.isNotBlank() } ?: "正在加载线路…")
-        } else {
-            setLineName("正在加载线路…")
-        }
+        val currentLine = if (clashRunning || previewCoreRunning) {
+            runCatching {
+                withClash {
+                    val names = queryProxyGroupNames(uiStore.proxyExcludeNotSelectable)
+                    names.firstOrNull()?.let { queryProxyGroup(it, uiStore.proxySort).now }
+                }
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+        } else null
+        if (currentLine != null) cachedLineName = currentLine
+        // Switching between the VPN core and PreviewService has a short period where
+        // neither core exposes proxy groups. Keep the last valid selection instead of
+        // replacing it with a loading label on every start/stop action.
+        setLineName(currentLine ?: cachedLineName ?: "正在加载线路…")
 
         withProfile {
             setProfileName(queryActive()?.name)
@@ -571,5 +575,9 @@ class MainActivity : BaseActivity<MainDesign>() {
         /** Riverpod's keepAlive equivalent for Activity-backed bottom-tab navigation. */
         @Volatile
         var cachedNetworkResult: String? = null
+
+        /** Retains the selected route while the service core is being restarted. */
+        @Volatile
+        var cachedLineName: String? = null
     }
 }
