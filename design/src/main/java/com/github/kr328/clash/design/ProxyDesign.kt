@@ -42,6 +42,7 @@ class ProxyDesign(
         .inflate(context.layoutInflater, context.root, false)
 
     private var config = ProxyViewConfig(context, uiStore.proxyLine)
+    private val selectableGroups = BooleanArray(groupNames.size)
 
     private val menu: ProxyMenu by lazy {
         ProxyMenu(context, binding.menuView, overrideMode, uiStore, requests) {
@@ -70,6 +71,7 @@ class ProxyDesign(
         parent: ProxyState,
         links: Map<String, ProxyState>
     ) {
+        selectableGroups[position] = selectable
         adapter.updateAdapter(position, proxies, selectable, parent, links)
 
         adapter.states[position].urlTesting = false
@@ -119,13 +121,7 @@ class ProxyDesign(
                         ProxyAdapter(
                             config = config,
                             clicked = { name -> requests.trySend(Request.Select(index, name)) },
-                            notSelectableClicked = {
-                                Toast.makeText(
-                                    context,
-                                    R.string.cloud_proxy_group_not_selectable_tips,
-                                    Toast.LENGTH_LONG,
-                                ).show()
-                            },
+                            notSelectableClicked = { showSelectableGroupTips(groupNames) },
                         )
                     }
                 ) {
@@ -165,6 +161,19 @@ class ProxyDesign(
         requests.trySend(Request.UrlTest(binding.pagesView.currentItem))
 
         updateUrlTestButtonStatus()
+    }
+
+    private fun showSelectableGroupTips(groupNames: List<String>) {
+        val available = groupNames.filterIndexed { index, _ -> selectableGroups[index] }
+        val message = if (available.isEmpty()) {
+            context.getString(R.string.cloud_proxy_group_no_selectable_tips)
+        } else {
+            context.getString(
+                R.string.cloud_proxy_group_not_selectable_tips,
+                available.joinToString("、"),
+            )
+        }
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
     }
 
     private fun updateUrlTestButtonStatus() {

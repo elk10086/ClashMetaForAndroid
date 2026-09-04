@@ -272,7 +272,8 @@
     <string name="doubles">Double</string>
     <string name="multiple">Multiple</string>
     <string name="not_selectable">Not Selectable</string>
-    <string name="cloud_proxy_group_not_selectable_tips">This group uses an automatic strategy. Switch to a manually selectable group to choose a line.</string>
+    <string name="cloud_proxy_group_not_selectable_tips">This group uses an automatic strategy. Choose a manually selectable group: %1$s</string>
+    <string name="cloud_proxy_group_no_selectable_tips">This configuration has no manually selectable proxy group.</string>
 
     <string name="providers">Providers</string>
 
