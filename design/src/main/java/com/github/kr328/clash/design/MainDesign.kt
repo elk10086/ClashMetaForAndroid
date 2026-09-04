@@ -239,6 +239,15 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
             textSize = 18f
             setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = dp(4)
+        })
+        content.addView(TextView(context).apply {
+            setText(R.string.cloud_mode_switch_hint)
+            setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorError))
+            textSize = 12f
+            setTypeface(typeface, Typeface.BOLD)
+            setLineSpacing(0f, 1.08f)
+        }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = dp(12)
         })
 

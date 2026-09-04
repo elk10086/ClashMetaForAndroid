@@ -427,6 +427,7 @@
     <string name="cloud_nav_profiles">Profiles</string>
     <string name="cloud_nav_mine">Me</string>
     <string name="cloud_dashboard_mode">Outbound mode</string>
+    <string name="cloud_mode_switch_hint">After changing modes, manually select a line again before use</string>
     <string name="cloud_mode_rule_desc">Recommended. Local sites as usual; others accelerated</string>
     <string name="cloud_mode_global_desc">Accelerate all websites</string>
     <string name="cloud_mode_direct_desc">No acceleration, browse as usual</string>
