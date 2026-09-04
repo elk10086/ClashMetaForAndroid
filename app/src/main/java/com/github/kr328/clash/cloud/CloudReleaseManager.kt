@@ -3,18 +3,21 @@ package com.github.kr328.clash.cloud
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.github.kr328.clash.BuildConfig
+import com.github.kr328.clash.CloudUpdateActivity
 import org.json.JSONObject
 
 object CloudReleaseManager {
     private const val PREFS = "cloud_release"
+    @Volatile private var updateDialogVisible = false
 
     suspend fun checkOnLaunch(activity: AppCompatActivity) {
         val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return
         showAnnouncement(activity, data, automatic = true)
-        showUpdate(activity, data, userInitiated = false)
+        showUpdate(activity, data)
     }
 
     suspend fun showAnnouncement(activity: AppCompatActivity, automatic: Boolean = false) {
@@ -24,11 +27,11 @@ object CloudReleaseManager {
 
     suspend fun checkUpdate(activity: AppCompatActivity) {
         val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return
-        if (!showUpdate(activity, data, userInitiated = true)) {
-            activity.runOnUiThread {
-                android.widget.Toast.makeText(activity, "当前已是最新版本", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
+        val remote = data.optString("version").trim().removePrefix("v")
+        val local = BuildConfig.BRAND_VERSION_NAME
+        val newer = isRemoteNewer(local, remote)
+        val forced = newer && data.optInt("forcedFlag", 0) == 2
+        activity.runOnUiThread { openUpdatePage(activity, data, remote.ifBlank { local }, local, forced, !newer, allowEmptyUrl = true) }
     }
 
     suspend fun customerServiceUrl(context: Context): String {
@@ -72,25 +75,61 @@ object CloudReleaseManager {
         }
     }
 
-    private fun showUpdate(activity: AppCompatActivity, data: JSONObject, userInitiated: Boolean): Boolean {
+    private fun showUpdate(activity: AppCompatActivity, data: JSONObject): Boolean {
         val flag = data.optInt("forcedFlag", 0)
         val remote = data.optString("version")
-        if (flag !in 1..2 || !isRemoteNewer(BuildConfig.VERSION_NAME, remote)) return false
-        val url = data.optString("updateAddress_android").ifBlank { data.optString("updateAddress") }
+        val local = BuildConfig.BRAND_VERSION_NAME
+        if (flag !in 1..2 || !isRemoteNewer(local, remote)) return false
+        if (updateDialogVisible) return true
         activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed || updateDialogVisible) return@runOnUiThread
+            updateDialogVisible = true
             val dialog = AlertDialog.Builder(activity)
-                .setTitle("版本更新")
-                .setMessage("最新版本：$remote\n当前版本：${BuildConfig.VERSION_NAME}\n\n${data.optString("versionIntroduction")}")
-                .setPositiveButton("立即更新") { _, _ ->
-                    if (url.startsWith("http")) activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                }
+                .setTitle(if (flag == 2) "版本更新" else "有新版本啦")
+                .setMessage("最新版本：${remote.removePrefix("v")}\n当前版本：$local\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}")
+                .setPositiveButton("立即更新", null)
                 .apply { if (flag != 2) setNegativeButton("稍后", null) }
                 .create()
             dialog.setCancelable(flag != 2)
             dialog.setCanceledOnTouchOutside(flag != 2)
+            dialog.setOnDismissListener { updateDialogVisible = false }
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    val url = data.optString("updateAddress_android").ifBlank { data.optString("updateAddress") }.trim()
+                    if (url.isBlank()) {
+                        Toast.makeText(activity, "当前没有可用的 Android 下载地址", Toast.LENGTH_LONG).show()
+                    } else {
+                        dialog.dismiss()
+                        openUpdatePage(activity, data, remote.removePrefix("v"), local, flag == 2, false)
+                    }
+                }
+            }
             dialog.show()
         }
         return true
+    }
+
+    private fun openUpdatePage(
+        activity: AppCompatActivity,
+        data: JSONObject,
+        remote: String,
+        local: String,
+        forced: Boolean,
+        latest: Boolean,
+        allowEmptyUrl: Boolean = false,
+    ) {
+        val url = data.optString("updateAddress_android").ifBlank { data.optString("updateAddress") }.trim()
+        if (!allowEmptyUrl && url.isBlank()) {
+            Toast.makeText(activity, "当前没有可用的 Android 下载地址", Toast.LENGTH_LONG).show()
+            return
+        }
+        activity.startActivity(Intent(activity, CloudUpdateActivity::class.java)
+            .putExtra(CloudUpdateActivity.EXTRA_REMOTE, remote)
+            .putExtra(CloudUpdateActivity.EXTRA_LOCAL, local)
+            .putExtra(CloudUpdateActivity.EXTRA_LOGS, data.optString("versionIntroduction"))
+            .putExtra(CloudUpdateActivity.EXTRA_URL, url)
+            .putExtra(CloudUpdateActivity.EXTRA_FORCED, forced)
+            .putExtra(CloudUpdateActivity.EXTRA_LATEST, latest))
     }
 
     private fun isRemoteNewer(localRaw: String, remoteRaw: String): Boolean {

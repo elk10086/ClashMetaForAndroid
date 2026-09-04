@@ -16,6 +16,7 @@
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Workaround for Android 17+ cross profile loopback networking restrictions.
          This permission allows CMFA to connect to loopback addresses and ports bound
@@ -71,6 +72,16 @@
             android:label="@string/cloud_login" />
         <activity android:name=".CloudMineActivity" android:exported="false" android:label="@string/cloud_nav_mine" />
         <activity android:name=".CloudBusinessActivity" android:exported="false" />
+        <activity android:name=".CloudUpdateActivity" android:exported="false" />
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/cloud_update_file_paths" />
+        </provider>
         <activity-alias
             android:name=".MainActivityAlias"
             android:exported="true"

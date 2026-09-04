@@ -54,7 +54,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import com.github.kr328.clash.design.R as DesignR
 
-private fun AppCompatActivity.applyCloudTheme() {
+internal fun AppCompatActivity.applyCloudTheme() {
     val store = UiStore(this)
     val dark = when (store.darkMode) {
         DarkMode.ForceDark -> true
