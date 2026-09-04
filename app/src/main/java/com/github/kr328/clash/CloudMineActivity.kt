@@ -102,14 +102,18 @@ private fun blendCloudColor(a: Int, b: Int, ratio: Float): Int = Color.rgb(
 )
 
 private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeStyle) {
-    0 -> Color.parseColor("#8DB4C9")
+    0 -> Color.parseColor(if (isCloudDark()) "#FFFFFF" else "#212121")
     1 -> Color.parseColor("#FFB3C9")
     2 -> Color.parseColor("#45B6E5")
     3 -> Color.parseColor("#C9A227")
     else -> resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
 }
 
-private fun Context.cloudButtonTextColor(): Int = Color.parseColor("#121212")
+private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).cloudThemeStyle == 0 && !isCloudDark()) {
+    Color.WHITE
+} else {
+    Color.parseColor("#121212")
+}
 
 private fun Context.isCloudDark(): Boolean = when (UiStore(this).darkMode) {
     DarkMode.ForceDark -> true

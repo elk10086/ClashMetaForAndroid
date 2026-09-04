@@ -170,7 +170,7 @@
     <style name="CloudThemeMinimal">
         <item name="colorPrimary">@color/theme_minimal</item>
         <item name="colorSecondary">@color/theme_minimal</item>
-        <item name="colorOnPrimary">#FF121212</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
         <item name="android:fontFamily">@font/skin_minimal</item>
         <item name="fontFamily">@font/skin_minimal</item>
     </style>
@@ -205,20 +205,26 @@
     </style>
 
     <style name="CloudThemeMinimalLight" parent="CloudThemeMinimal">
-        <item name="android:windowBackground">#FFF5F9FB</item>
-        <item name="colorSurface">#FFEAF2F6</item>
-        <item name="colorControlNormal">#FF263238</item>
-        <item name="colorOnSurface">#FF263238</item>
-        <item name="android:textColor">#FF263238</item>
-        <item name="colorControlHighlight">#268DB4C9</item>
+        <item name="colorPrimary">#FF212121</item>
+        <item name="colorSecondary">#FF424242</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
+        <item name="android:windowBackground">#FFFAFAFA</item>
+        <item name="colorSurface">#FFF5F5F5</item>
+        <item name="colorControlNormal">#FF212121</item>
+        <item name="colorOnSurface">#FF212121</item>
+        <item name="android:textColor">#FF212121</item>
+        <item name="colorControlHighlight">#1F212121</item>
     </style>
     <style name="CloudThemeMinimalDark" parent="CloudThemeMinimal">
-        <item name="android:windowBackground">#FF101416</item>
-        <item name="colorSurface">#FF1A2125</item>
-        <item name="colorControlNormal">#FFDDEBF1</item>
-        <item name="colorOnSurface">#FFDDEBF1</item>
-        <item name="android:textColor">#FFDDEBF1</item>
-        <item name="colorControlHighlight">#408DB4C9</item>
+        <item name="colorPrimary">#FFFFFFFF</item>
+        <item name="colorSecondary">#FFBDBDBD</item>
+        <item name="colorOnPrimary">#FF121212</item>
+        <item name="android:windowBackground">#FF121212</item>
+        <item name="colorSurface">#FF1A1A1A</item>
+        <item name="colorControlNormal">#FFE8E8E8</item>
+        <item name="colorOnSurface">#FFE8E8E8</item>
+        <item name="android:textColor">#FFE8E8E8</item>
+        <item name="colorControlHighlight">#33FFFFFF</item>
     </style>
     <style name="CloudThemeSakuraLight" parent="CloudThemeSakura">
         <item name="android:windowBackground">#FFFFF7FA</item>
