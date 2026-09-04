@@ -1,7 +1,7 @@
 package com.github.kr328.clash.design
 
 import android.content.Context
-import android.graphics.Color
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.view.View
@@ -159,12 +159,15 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         )
         options.forEachIndexed { index, (mode, title, description) ->
             val selected = mode == selectedMode
+            val primaryColor = context.resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+            val selectedContentColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
+            val normalContentColor = context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding(dp(12), dp(10), dp(8), dp(10))
                 background = background(
-                    if (selected) context.resolveThemedColor(com.google.android.material.R.attr.colorPrimary) else context.resolveThemedColor(com.google.android.material.R.attr.colorSurface),
+                    if (selected) primaryColor else context.resolveThemedColor(com.google.android.material.R.attr.colorSurface),
                     12,
                 )
                 isClickable = true
@@ -174,13 +177,13 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
                 orientation = LinearLayout.VERTICAL
                 addView(TextView(context).apply {
                     setText(title)
-                    setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface))
+                    setTextColor(if (selected) selectedContentColor else normalContentColor)
                     textSize = 16f
                     setTypeface(typeface, Typeface.BOLD)
                 })
                 addView(TextView(context).apply {
                     setText(description)
-                    setTextColor(context.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface))
+                    setTextColor(if (selected) selectedContentColor else normalContentColor)
                     alpha = .65f
                     textSize = 13f
                     setPadding(0, dp(3), 0, 0)
@@ -190,6 +193,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
             row.addView(RadioButton(context).apply {
                 isChecked = selected
                 isClickable = false
+                buttonTintList = ColorStateList.valueOf(if (selected) selectedContentColor else primaryColor)
             })
             row.setOnClickListener {
                 selectedMode = mode
