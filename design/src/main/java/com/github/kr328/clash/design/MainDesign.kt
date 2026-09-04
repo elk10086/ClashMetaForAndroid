@@ -74,9 +74,9 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         val pulse = binding.powerPulseView
         powerPulseAnimator = AnimatorSet().apply {
             playTogether(
-                ObjectAnimator.ofFloat(pulse, View.SCALE_X, 0.96f, 1.14f),
-                ObjectAnimator.ofFloat(pulse, View.SCALE_Y, 0.96f, 1.14f),
-                ObjectAnimator.ofFloat(pulse, View.ALPHA, 0.62f, 0f),
+                ObjectAnimator.ofFloat(pulse, View.SCALE_X, 0.94f, 1.14f),
+                ObjectAnimator.ofFloat(pulse, View.SCALE_Y, 0.94f, 1.14f),
+                ObjectAnimator.ofFloat(pulse, View.ALPHA, 0f, 0.38f, 0f),
             )
             childAnimations.forEach {
                 (it as ValueAnimator).apply {

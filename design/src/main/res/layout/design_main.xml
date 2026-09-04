@@ -199,6 +199,7 @@
                         android:layout_width="132dp"
                         android:layout_height="132dp"
                         android:layout_gravity="center"
+                        android:alpha="0"
                         android:background="@drawable/cloud_power_pulse"
                         android:visibility="@{clashRunning ? View.VISIBLE : View.GONE}" />
 
