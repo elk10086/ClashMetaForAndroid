@@ -80,7 +80,7 @@
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:layout_toStartOf="@id/menu_view"
-            android:background="?attr/colorControlHighlight"
+            android:background="?attr/colorOutline"
             android:minHeight="@{@dimen/item_tailing_component_size * 1.5f}" />
 
         <FrameLayout

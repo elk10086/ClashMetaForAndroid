@@ -269,7 +269,8 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun vertical() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     private fun LinearLayout.addSpace(height: Int) = addView(View(this@CloudAuthActivity), lp(1, dp(height)))
     private fun lp(width: Int, height: Int) = LinearLayout.LayoutParams(width, height)
-    private fun rounded(color: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(dp(1), it) } }
+    private fun rounded(color: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(borderPx(), it) } }
+    private fun borderPx() = (resources.displayMetrics.density * .5f).toInt().coerceAtLeast(1)
     private fun updateClearIcon(field: EditText) = field.setCompoundDrawablesWithIntrinsicBounds(0, 0, if (field.text.isNullOrEmpty()) 0 else R.drawable.cloud_clear, 0)
     private fun serviceButton() = ImageView(this).apply {
         setImageResource(R.drawable.cloud_headset)

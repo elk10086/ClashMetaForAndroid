@@ -88,7 +88,7 @@ private fun Context.cloudColor(value: String): Int {
             "#212121", "#000000", "#424242" -> onSurface
             "#616161", "#757575", "#9E9E9E" -> blendCloudColor(onSurface, surface, .38f)
             "#EEEEEE", "#E8E8E8" -> blendCloudColor(surface, onSurface, .09f)
-            "#E0E0E0", "#BDBDBD" -> blendCloudColor(surface, onSurface, .18f)
+            "#E0E0E0", "#BDBDBD" -> blendCloudColor(surface, onSurface, .10f)
             else -> Color.parseColor(value)
         }
     }
@@ -119,6 +119,8 @@ private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeSty
 }
 
 private fun Context.cloudSecondaryColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorSecondary)
+
+private fun Context.cloudOutlineColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorOutline)
 
 private fun Context.cloudErrorColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorError)
 
@@ -401,9 +403,8 @@ class CloudMineActivity : AppCompatActivity() {
         orientation = LinearLayout.VERTICAL
         rows.forEachIndexed { index, row ->
             if (index > 0) addView(View(this@CloudMineActivity).apply {
-                setBackgroundColor(cloudColor("#E0E0E0"))
-                alpha = .6f
-            }, LinearLayout.LayoutParams(-1, dp(1)).apply {
+                setBackgroundColor(cloudOutlineColor())
+            }, LinearLayout.LayoutParams(-1, borderPx()).apply {
                 marginStart = dp(72)
                 marginEnd = dp(16)
             })
@@ -446,10 +447,11 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun vertical() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun borderPx() = (resources.displayMetrics.density * .5f).toInt().coerceAtLeast(1)
     private fun toast(e: Throwable) = Toast.makeText(this, e.message ?: "操作失败", Toast.LENGTH_LONG).show()
     private fun roundRect(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
         setColor(if (fill == "#212121") cloudPrimaryColor() else cloudColor(fill)); cornerRadius = dp(radius).toFloat()
-        if (stroke != null) setStroke(dp(1), if (stroke == "#212121") cloudPrimaryColor() else cloudColor(stroke))
+        if (stroke != null) setStroke(borderPx(), if (stroke == "#212121") cloudPrimaryColor() else cloudOutlineColor())
     }
 }
 
@@ -591,7 +593,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 listOf(cloudPrimaryColor(), cloudSelectedContainerColor(), cloudColor("#E0E0E0"), cloudColor("#FFFFFF")).forEach { color ->
                     addView(View(this@CloudBusinessActivity).apply {
-                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color); setStroke(dp(1), cloudColor("#E0E0E0")) }
+                        background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color); setStroke(borderPx(), cloudOutlineColor()) }
                     }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) })
                 }
             })
@@ -908,7 +910,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                     setTextColor(if (period == selected) cloudSelectedTextColor() else cloudColor("#212121")); setPadding(dp(6), dp(5), dp(6), dp(5))
                     background = if (period == selected) GradientDrawable().apply {
                         setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat()
-                        setStroke(dp(1), cloudPrimaryColor())
+                        setStroke(borderPx(), cloudPrimaryColor())
                     } else rounded("#FFFFFF", 12, "#E0E0E0")
                     isClickable = true; setOnClickListener { selected = period; discount = 0; redrawChips(); updateAmount() }
                 }, GridLayout.LayoutParams().apply {
@@ -1108,8 +1110,8 @@ class CloudBusinessActivity : AppCompatActivity() {
             if (surplusAmount > 0) addView(amountRow("旧订阅折抵", surplusAmount))
             if (balanceAmount > 0) addView(amountRow("余额抵扣", balanceAmount))
             addView(View(this@CloudBusinessActivity).apply {
-                setBackgroundColor(cloudColor("#E0E0E0"))
-            }, LinearLayout.LayoutParams(-1, dp(1)).apply { topMargin = dp(8); bottomMargin = dp(8) })
+                setBackgroundColor(cloudOutlineColor())
+            }, LinearLayout.LayoutParams(-1, borderPx()).apply { topMargin = dp(8); bottomMargin = dp(8) })
             addView(amountRow("实付金额", totalAmount, true))
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "立即支付"; textSize = 15f; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor())
@@ -1625,7 +1627,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             setOnClickListener { click() }
             setOnFocusChangeListener { view, focused ->
                 view.animate().scaleX(if (focused) 1.035f else 1f).scaleY(if (focused) 1.035f else 1f).setDuration(120).start()
-                (view.background as? GradientDrawable)?.setStroke(dp(if (focused) 3 else 1), cloudColor(if (focused) "#212121" else "#E0E0E0"))
+                (view.background as? GradientDrawable)?.setStroke(borderPx(), if (focused) cloudPrimaryColor() else cloudOutlineColor())
             }
             addView(TextView(this@CloudBusinessActivity).apply { text = title; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD) })
             addView(TextView(this@CloudBusinessActivity).apply { text = subtitle; textSize = 13f; setTextColor(cloudColor("#757575")); setPadding(0, dp(6), 0, 0) })
@@ -1649,11 +1651,12 @@ class CloudBusinessActivity : AppCompatActivity() {
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
     private fun formatTicketTimestamp(timestamp: Long, pattern: String) = if (timestamp <= 0) "" else
         java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
-    private fun roundedCard() = GradientDrawable().apply { setColor(cloudColor("#FFFFFF")); cornerRadius = dp(14).toFloat(); setStroke(dp(1), cloudColor("#E0E0E0")) }
+    private fun roundedCard() = GradientDrawable().apply { setColor(cloudColor("#FFFFFF")); cornerRadius = dp(14).toFloat(); setStroke(borderPx(), cloudOutlineColor()) }
     private fun rounded(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
         setColor(if (fill == "#212121") cloudPrimaryColor() else cloudColor(fill)); cornerRadius = dp(radius).toFloat()
-        stroke?.let { setStroke(dp(1), if (it == "#212121") cloudPrimaryColor() else cloudColor(it)) }
+        stroke?.let { setStroke(borderPx(), if (it == "#212121") cloudPrimaryColor() else cloudOutlineColor()) }
     }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun borderPx() = (resources.displayMetrics.density * .5f).toInt().coerceAtLeast(1)
     private fun toast(e: Throwable) = Toast.makeText(this, e.message ?: "操作失败", Toast.LENGTH_LONG).show()
 }

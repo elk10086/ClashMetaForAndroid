@@ -284,7 +284,7 @@ class CloudUpdateActivity : AppCompatActivity() {
     private fun surfaceVariant() = color(com.google.android.material.R.attr.colorSurfaceVariant)
     private fun outline() = color(com.google.android.material.R.attr.colorOutline)
     private fun rounded(fill: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply {
-        setColor(fill); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(dp(1), it) }
+        setColor(fill); cornerRadius = dp(radius).toFloat(); stroke?.let { setStroke(borderPx(), it) }
     }
     private fun formatBytes(value: Long): String = when {
         value >= 1024L * 1024L -> String.format(java.util.Locale.US, "%.1f MB", value / 1024.0 / 1024.0)
@@ -293,6 +293,7 @@ class CloudUpdateActivity : AppCompatActivity() {
     }
     private fun formatSpeed(value: Double): String = if (value >= 1024 * 1024) String.format(java.util.Locale.US, "%.2f MB/s", value / 1024 / 1024) else String.format(java.util.Locale.US, "%.1f KB/s", value / 1024)
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun borderPx() = (resources.displayMetrics.density * .5f).toInt().coerceAtLeast(1)
 
     companion object {
         const val EXTRA_REMOTE = "remote_version"

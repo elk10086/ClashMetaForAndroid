@@ -66,8 +66,8 @@
 
             <View
                 android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:background="?attr/colorControlHighlight" />
+                android:layout_height="@dimen/divider_size"
+                android:background="?attr/colorOutline" />
 
             <TextView
                 android:layout_width="match_parent"
