@@ -1,6 +1,9 @@
 package com.github.kr328.clash.cloud
 
-/** Matches free_time_new's browserUa for every cloud/backend HTTP request. */
+import com.github.kr328.clash.BuildConfig
+
+/** Matches free_time_new's PackageInfo.ua client identity. */
 object CloudUserAgent {
-    const val value = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    val value: String
+        get() = "${BuildConfig.BRAND_DISPLAY_NAME}/v${BuildConfig.BRAND_VERSION_NAME} clash-verge Platform/android"
 }

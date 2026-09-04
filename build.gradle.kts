@@ -146,6 +146,7 @@ subprojects {
                     resValue("string", "application_name", displayName)
                     buildConfigField("String", "BRAND_ID", "\"$id\"")
                     buildConfigField("String", "BRAND_DISPLAY_NAME", "\"$displayName\"")
+                    buildConfigField("String", "BRAND_VERSION_NAME", "\"$brandVersionName\"")
                     buildConfigField("String", "BRAND_OFFICIAL_SITE_URL", "\"$officialSiteUrl\"")
                     buildConfigField("String", "BRAND_OFFICIAL_SITE_HOST", "\"$officialSiteHost\"")
                     buildConfigField("String", "BRAND_CUSTOMER_SERVICE_URL", "\"$customerServiceUrl\"")
