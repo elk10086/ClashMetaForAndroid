@@ -61,7 +61,7 @@ object CloudReleaseManager {
         return data.optString("customerServiceUrl", data.optString("customer_service_url"))
     }
 
-    /** Login anti-loss address: announcement link first, then the backend entry domain. */
+    /** Login anti-loss address: use img_url only when configured, otherwise keep the brand default. */
     suspend fun officialSiteUrl(context: Context): String {
         val data = CloudApi(context).remoteConfig().optJSONObject("data")
         return resolveOfficialSiteUrl(data)
@@ -70,8 +70,6 @@ object CloudReleaseManager {
     private fun resolveOfficialSiteUrl(data: JSONObject?): String {
         val raw = sequenceOf(
             data?.optString("img_url"),
-            data?.optString("baseUrl"),
-            data?.optJSONArray("loginDomains")?.optString(0),
             BuildConfig.BRAND_OFFICIAL_SITE_URL,
         ).mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }.first()
         val normalized = if (raw.contains("://")) raw else "https://$raw"
