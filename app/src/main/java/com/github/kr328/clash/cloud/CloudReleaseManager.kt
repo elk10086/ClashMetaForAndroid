@@ -3,6 +3,7 @@ package com.github.kr328.clash.cloud
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -139,7 +140,7 @@ object CloudReleaseManager {
                 .setTitle(if (flag == 2) "版本更新" else "有新版本啦")
                 .setMessage("最新版本：${remote.removePrefix("v")}\n当前版本：$local\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}")
                 .setPositiveButton("立即更新", null)
-                .apply { if (flag != 2) setNegativeButton("稍后", null) }
+                .apply { if (flag != 2) setNegativeButton("稍后再说", null) }
                 .create()
             dialog.setCancelable(flag != 2)
             dialog.setCanceledOnTouchOutside(flag != 2)
@@ -179,8 +180,48 @@ object CloudReleaseManager {
             .putExtra(CloudUpdateActivity.EXTRA_LOCAL, local)
             .putExtra(CloudUpdateActivity.EXTRA_LOGS, data.optString("versionIntroduction"))
             .putExtra(CloudUpdateActivity.EXTRA_URL, url)
+            .putExtra(CloudUpdateActivity.EXTRA_PLATFORM_URLS, otherPlatformUrls(data).toString())
             .putExtra(CloudUpdateActivity.EXTRA_FORCED, forced)
             .putExtra(CloudUpdateActivity.EXTRA_LATEST, latest))
+    }
+
+    /** Matches free_time_new: the detail page also exposes every non-current platform address. */
+    private fun otherPlatformUrls(data: JSONObject): JSONObject = JSONObject().apply {
+        data.optString("updateAddress_ios").trim().takeIf(String::isNotEmpty)?.let { put("iOS", it) }
+        pickArchitectureUrl(
+            data.optString("updateAddress_windows").trim(),
+            data.optString("updateAddress_windows_arm64").trim(),
+            data.optString("updateAddress_windows_x64").trim(),
+        ).takeIf(String::isNotEmpty)?.let { put("Windows", it) }
+        val macGeneric = data.optString("updateAddress_mac").trim()
+        val macCombined = parseMacCombinedUrls(macGeneric)
+        pickArchitectureUrl(
+            macGeneric,
+            data.optString("updateAddress_mac_arm64").trim().ifBlank { macCombined.first },
+            data.optString("updateAddress_mac_x64").trim().ifBlank { macCombined.second },
+        ).takeIf(String::isNotEmpty)?.let { put("macOS", it) }
+    }
+
+    private fun pickArchitectureUrl(generic: String, arm64: String, x64: String): String {
+        val isArm64 = Build.SUPPORTED_ABIS.any { it.contains("arm64", true) || it.contains("aarch64", true) }
+        return if (isArm64) arm64.ifBlank { generic.ifBlank { x64 } }
+        else x64.ifBlank { generic.ifBlank { arm64 } }
+    }
+
+    /** The backend may put both labelled macOS links in the legacy generic field. */
+    private fun parseMacCombinedUrls(raw: String): Pair<String, String> {
+        val armHints = listOf("arm64", "aarch64", "apple", "苹果", "m芯片", "m1", "m2", "m3")
+        val x64Hints = listOf("x64", "x86_64", "amd64", "intel", "英特尔", "因特尔")
+        var arm = ""
+        var x64 = ""
+        Regex("https?://[^\\s]+", RegexOption.IGNORE_CASE).findAll(raw).forEach { match ->
+            val url = match.value.trim().trimEnd(')', ']', '>', ',', ';', '，', '；')
+            val line = raw.lineSequence().firstOrNull { it.contains(match.value) }.orEmpty().lowercase()
+            val hint = "$line ${url.lowercase()}"
+            if (arm.isBlank() && armHints.any(hint::contains)) arm = url
+            else if (x64.isBlank() && x64Hints.any(hint::contains)) x64 = url
+        }
+        return arm to x64
     }
 
     private fun isRemoteNewer(localRaw: String, remoteRaw: String): Boolean {

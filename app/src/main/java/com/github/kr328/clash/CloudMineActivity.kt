@@ -177,7 +177,7 @@ private fun Context.cloudSelectedTextColor(): Int {
     }
 }
 
-private fun Context.applyCloudTypography(view: View) {
+internal fun Context.applyCloudTypography(view: View) {
     if (view.tag == "cloud_bottom_navigation_typography") return
     val skin = UiStore(this).cloudThemeStyle
     if (skin < 0) return
