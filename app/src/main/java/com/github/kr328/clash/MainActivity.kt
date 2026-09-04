@@ -259,9 +259,10 @@ class MainActivity : BaseActivity<MainDesign>() {
             subscriptionMutex.withLock {
                 var failure: Throwable? = null
                 var subscription: CloudSubscription? = null
+                val cloudApi = CloudApi(this@MainActivity)
                 repeat(3) { attempt ->
                     if (subscription == null) {
-                        runCatching { CloudApi(this).subscription() }
+                        runCatching { cloudApi.subscription() }
                             .onSuccess { subscription = it }
                             .onFailure { failure = it }
                         if (subscription == null && attempt < 2) delay(2_000)
@@ -274,7 +275,21 @@ class MainActivity : BaseActivity<MainDesign>() {
                 design.fetchCloudAccount()
                 // Membership display and profile import are independent in hle_fi. A profile
                 // refresh failure must not hide membership data that was fetched successfully.
-                runCatching { importCloudProfile(loaded.subscribeUrl) }
+                val subscriptionUrls = cloudApi.subscriptionUrls(loaded.subscribeUrl)
+                var importFailure: Throwable? = if (subscriptionUrls.isEmpty()) {
+                    IllegalStateException("订阅地址无效")
+                } else null
+                for (url in subscriptionUrls) {
+                    val imported = runCatching { importCloudProfile(url) }
+                        .onFailure { importFailure = it }
+                        .isSuccess
+                    if (imported) {
+                        cloudApi.rememberSuccessfulSubscriptionUrl(url)
+                        importFailure = null
+                        break
+                    }
+                }
+                if (importFailure != null) cloudSyncError = importFailure?.message ?: "订阅内容导入失败"
                 design.fetch()
             }
         } catch (e: Throwable) {
