@@ -2,13 +2,27 @@ package com.github.kr328.clash.cloud
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
+import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.github.kr328.clash.BuildConfig
 import com.github.kr328.clash.CloudUpdateActivity
+import com.github.kr328.clash.design.util.resolveThemedColor
+import com.google.android.material.button.MaterialButton
 import org.json.JSONObject
 
 object CloudReleaseManager {
@@ -107,24 +121,116 @@ object CloudReleaseManager {
         if (!hasAnnouncementContent(data)) return
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            val density = activity.resources.displayMetrics.density
+            fun dp(value: Int) = (value * density).toInt()
+            fun rounded(fill: Int, radius: Int, stroke: Int? = null) = GradientDrawable().apply {
+                setColor(fill)
+                cornerRadius = dp(radius).toFloat()
+                stroke?.let { setStroke(dp(1), it) }
+            }
+
+            val primary = activity.resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
+            val onPrimary = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
+            val surface = activity.resolveThemedColor(com.google.android.material.R.attr.colorSurface)
+            val onSurface = activity.resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+            val outline = activity.resolveThemedColor(com.google.android.material.R.attr.colorOutline)
+
+            val root = LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(22), dp(20), dp(22), dp(20))
+                background = rounded(surface, 22, outline)
+            }
+            val header = LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            header.addView(TextView(activity).apply {
+                text = "!"
+                gravity = Gravity.CENTER
+                textSize = 18f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(onPrimary)
+                background = rounded(primary, 18)
+            }, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginEnd = dp(12) })
+            header.addView(TextView(activity).apply {
+                text = title.ifBlank { "公告" }
+                textSize = 19f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(onSurface)
+                maxLines = 2
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+            val close = TextView(activity).apply {
+                text = "×"
+                contentDescription = "关闭公告"
+                gravity = Gravity.CENTER
+                textSize = 25f
+                setTextColor(onSurface)
+                background = rounded(Color.TRANSPARENT, 18, outline)
+                isClickable = true
+                isFocusable = true
+            }
+            header.addView(close, LinearLayout.LayoutParams(dp(36), dp(36)).apply { marginStart = dp(12) })
+            root.addView(header)
+
+            val message = TextView(activity).apply {
+                text = content
+                textSize = 15f
+                setTextColor(onSurface)
+                setLineSpacing(dp(4).toFloat(), 1f)
+                visibility = if (content.isBlank()) View.GONE else View.VISIBLE
+            }
+            val scroll = object : ScrollView(activity) {
+                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                    super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+                    setMeasuredDimension(measuredWidth, measuredHeight.coerceAtMost(dp(320)))
+                }
+            }.apply {
+                isFillViewport = false
+                clipToPadding = false
+                addView(message, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            }
+            root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = if (content.isBlank()) 0 else dp(18)
+            })
+
+            val action = MaterialButton(activity).apply {
+                text = data.optString("btnTitle").ifBlank { if (openLink) "关闭" else "我知道了" }
+                textSize = 15f
+                setTextColor(onPrimary)
+                setTypeface(typeface, Typeface.BOLD)
+                backgroundTintList = ColorStateList.valueOf(primary)
+                cornerRadius = dp(14)
+                insetTop = 0
+                insetBottom = 0
+            }
+            root.addView(action, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(48)).apply {
+                topMargin = dp(22)
+            })
+
             val dialog = AlertDialog.Builder(activity)
-                .setTitle(title.ifBlank { "公告" })
-                .setMessage(content)
-                .setPositiveButton(data.optString("btnTitle").ifBlank { if (openLink) "关闭" else "我知道了" }, null)
+                .setView(root, 0, 0, 0, 0)
                 .create()
             dialog.setOnDismissListener {
                 onDismiss?.invoke()
             }
+            close.setOnClickListener { dialog.dismiss() }
+            action.setOnClickListener {
+                if (!openLink) {
+                    dialog.dismiss()
+                } else {
+                    val target = resolveOfficialSiteUrl(data)
+                    runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
+                        .onSuccess { dialog.dismiss() }
+                        .onFailure { Toast.makeText(activity, "无法打开公告链接", Toast.LENGTH_LONG).show() }
+                }
+            }
             dialog.setOnShowListener {
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    if (!openLink) {
-                        dialog.dismiss()
-                    } else {
-                        val target = resolveOfficialSiteUrl(data)
-                        runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(target))) }
-                            .onSuccess { dialog.dismiss() }
-                            .onFailure { Toast.makeText(activity, "无法打开公告链接", Toast.LENGTH_LONG).show() }
-                    }
+                val width = (activity.resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(480))
+                dialog.window?.apply {
+                    setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+                    setLayout(width, WindowManager.LayoutParams.WRAP_CONTENT)
+                    setDimAmount(0.42f)
                 }
             }
             dialog.show()
