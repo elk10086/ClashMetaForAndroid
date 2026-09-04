@@ -193,7 +193,7 @@ object CloudReleaseManager {
             })
 
             val action = MaterialButton(activity).apply {
-                text = data.optString("btnTitle").ifBlank { if (openLink) "关闭" else "我知道了" }
+                text = if (openLink) data.optString("btnTitle").ifBlank { "关闭" } else "关闭"
                 textSize = 15f
                 setTextColor(onPrimary)
                 setTypeface(typeface, Typeface.BOLD)
