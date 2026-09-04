@@ -14,10 +14,16 @@ import kotlinx.coroutines.sync.Mutex
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.Proxy
 import java.net.URL
 import java.net.URLEncoder
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
+import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLContext
+import javax.net.ssl.X509TrustManager
 
 data class CloudSubscription(
     val email: String,
@@ -217,7 +223,7 @@ class CloudApi(private val context: Context) {
     ): JSONObject {
         val query = params.entries.joinToString("&") { "${encode(it.key)}=${encode(it.value)}" }
         val target = base.trimEnd('/') + path + if (query.isEmpty()) "" else "?$query"
-        val connection = URL(target).openConnection() as HttpURLConnection
+        val connection = cloudConnection(target)
         connection.requestMethod = method
         connection.connectTimeout = 15_000
         connection.readTimeout = 15_000
@@ -273,7 +279,7 @@ class CloudApi(private val context: Context) {
     }
 
     private fun probeBaseUrl(base: String): Boolean {
-        val connection = URL("${base.trimEnd('/')}/api/v1/guest/comm/config").openConnection() as HttpURLConnection
+        val connection = cloudConnection("${base.trimEnd('/')}/api/v1/guest/comm/config")
         connection.connectTimeout = 12_000
         connection.readTimeout = 10_000
         connection.setRequestProperty("Accept", "application/json")
@@ -320,7 +326,7 @@ class CloudApi(private val context: Context) {
     private fun origin(uri: Uri): String = "${uri.scheme!!.lowercase()}://${uri.host!!.lowercase()}${if (uri.port >= 0) ":${uri.port}" else ""}"
 
     private fun readConfigDocument(url: String): JSONObject {
-        val connection = URL(url).openConnection() as HttpURLConnection
+        val connection = cloudConnection(url)
         connection.connectTimeout = 10_000
         connection.readTimeout = 10_000
         connection.setRequestProperty("User-Agent", ClientUserAgent.value(context))
@@ -347,10 +353,29 @@ class CloudApi(private val context: Context) {
     private val configUrls: List<String>
         get() = BuildConfig.BRAND_CONFIG_URLS.split('|').filter { it.startsWith("https://") }
 
+    /** Mirrors free_time_new CloudRequest.badCertificateCallback for cloud routes only. */
+    private fun cloudConnection(url: String): HttpURLConnection =
+        (URL(url).openConnection(Proxy.NO_PROXY) as HttpURLConnection).apply {
+            if (this is HttpsURLConnection) {
+                sslSocketFactory = cloudSslSocketFactory
+                hostnameVerifier = javax.net.ssl.HostnameVerifier { _, _ -> true }
+            }
+        }
+
     private class HttpStatusException(val code: Int, message: String) : IOException(message)
 
     companion object {
         private val baseUrlSelectionMutex = Mutex()
+        private val cloudSslSocketFactory by lazy {
+            val trustManager = object : X509TrustManager {
+                override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) = Unit
+            }
+            SSLContext.getInstance("TLS").apply {
+                init(null, arrayOf(trustManager), SecureRandom())
+            }.socketFactory
+        }
     }
 }
 
