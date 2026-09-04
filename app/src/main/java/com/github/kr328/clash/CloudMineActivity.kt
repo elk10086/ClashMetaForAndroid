@@ -111,6 +111,41 @@ private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeSty
 
 private fun Context.cloudButtonTextColor(): Int = Color.parseColor("#121212")
 
+private fun Context.isCloudDark(): Boolean = when (UiStore(this).darkMode) {
+    DarkMode.ForceDark -> true
+    DarkMode.ForceLight -> false
+    DarkMode.Auto -> resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+}
+
+/** Mirrors CommonCard's selected secondaryContainer/onSecondaryContainer colors in free_time_new. */
+private fun Context.cloudSelectedContainerColor(): Int {
+    val dark = isCloudDark()
+    val container = when (UiStore(this).cloudThemeStyle) {
+        0 -> Color.parseColor(if (dark) "#242424" else "#E0E0E0")
+        1 -> Color.parseColor(if (dark) "#32232D" else "#FFEDF4")
+        2 -> Color.parseColor(if (dark) "#122530" else "#D8F2FA")
+        3 -> Color.parseColor(if (dark) "#1C1C1C" else "#E9DFC7")
+        else -> blendCloudColor(
+            resolveThemedColor(com.google.android.material.R.attr.colorSurface),
+            resolveThemedColor(com.google.android.material.R.attr.colorPrimary),
+            .18f,
+        )
+    }
+    // CommonCardType.filled uses secondaryContainer.opacity80 over the surface.
+    return blendCloudColor(container, resolveThemedColor(com.google.android.material.R.attr.colorSurface), .20f)
+}
+
+private fun Context.cloudSelectedTextColor(): Int {
+    val dark = isCloudDark()
+    return when (UiStore(this).cloudThemeStyle) {
+        0 -> Color.parseColor(if (dark) "#E8E8E8" else "#212121")
+        1 -> Color.parseColor(if (dark) "#F5DDE8" else "#4A1730")
+        2 -> Color.parseColor(if (dark) "#DDF4FA" else "#052A3A")
+        3 -> Color.parseColor(if (dark) "#ECE8E0" else "#1A1816")
+        else -> resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
+    }
+}
+
 private fun Context.applyCloudTypography(view: View) {
     val skin = UiStore(this).cloudThemeStyle
     if (skin < 0) return
@@ -422,7 +457,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                         gravity = Gravity.CENTER_VERTICAL
                         setPadding(dp(14), dp(12), dp(14), dp(12))
                         background = if (selected) GradientDrawable().apply {
-                            setColor(cloudPrimaryColor()); cornerRadius = dp(16).toFloat()
+                            setColor(cloudSelectedContainerColor()); cornerRadius = dp(16).toFloat()
                         } else rounded("#FFFFFF", 16, "#E0E0E0")
                         isClickable = true; isFocusable = true
                         setOnClickListener {
@@ -435,12 +470,12 @@ class CloudBusinessActivity : AppCompatActivity() {
                         addView(TextView(this@CloudBusinessActivity).apply {
                             text = (if (selected) "✓  " else "") + names[index]
                             textSize = 16f; setTypeface(typeface, Typeface.BOLD)
-                            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#212121"))
+                            setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#212121"))
                         })
                         addView(TextView(this@CloudBusinessActivity).apply {
                             text = descriptions[index]; textSize = 12f; setPadding(0, dp(7), 0, 0)
-                            setTextColor(if (selected) cloudButtonTextColor() else cloudColor("#757575"))
-                            alpha = if (selected) .72f else 1f
+                            setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#757575"))
+                            alpha = if (selected) .78f else 1f
                         })
                     }, LinearLayout.LayoutParams(0, dp(94), 1f).apply {
                         if (index % 2 == 1) marginStart = dp(10)
@@ -615,8 +650,11 @@ class CloudBusinessActivity : AppCompatActivity() {
             periods.forEachIndexed { index, period ->
                 chips.addView(TextView(this).apply {
                     text = "${period.second}\n¥${money(planPrice(plan, period.first))}"; textSize = 13f; gravity = Gravity.CENTER
-                    setTextColor(cloudColor("#212121")); setPadding(dp(6), dp(5), dp(6), dp(5))
-                    background = rounded(if (period == selected) "#E8E8E8" else "#FFFFFF", 12, if (period == selected) "#212121" else "#E0E0E0")
+                    setTextColor(if (period == selected) cloudSelectedTextColor() else cloudColor("#212121")); setPadding(dp(6), dp(5), dp(6), dp(5))
+                    background = if (period == selected) GradientDrawable().apply {
+                        setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat()
+                        setStroke(dp(1), cloudPrimaryColor())
+                    } else rounded("#FFFFFF", 12, "#E0E0E0")
                     isClickable = true; setOnClickListener { selected = period; discount = 0; redrawChips(); updateAmount() }
                 }, GridLayout.LayoutParams().apply {
                     width = 0; height = dp(58); columnSpec = GridLayout.spec(index % 3, 1f); rowSpec = GridLayout.spec(index / 3)
