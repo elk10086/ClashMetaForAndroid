@@ -12,6 +12,7 @@ import com.github.kr328.clash.CloudUpdateActivity
 import org.json.JSONObject
 
 object CloudReleaseManager {
+    private const val PREFS = "cloud_release"
     @Volatile private var updateDialogVisible = false
 
     suspend fun checkOnLaunch(activity: AppCompatActivity): JSONObject? {
@@ -30,6 +31,21 @@ object CloudReleaseManager {
 
     fun showLoginAnnouncement(activity: AppCompatActivity, data: JSONObject, automatic: Boolean = false) =
         showAnnouncement(activity, data, automatic, openLink = true)
+
+    fun isDashboardAnnouncementUnread(context: Context, data: JSONObject): Boolean {
+        if (data.optInt("show", 0) !in 1..2 || !hasAnnouncementContent(data)) return false
+        return !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("dashboard_announcement_read_${announcementSignature(data)}", false)
+    }
+
+    fun showDashboardAnnouncement(activity: AppCompatActivity, data: JSONObject, onRead: () -> Unit) {
+        showAnnouncement(activity, data, automatic = false, openLink = false) {
+            activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean("dashboard_announcement_read_${announcementSignature(data)}", true)
+                .apply()
+            onRead()
+        }
+    }
 
     suspend fun checkUpdate(activity: AppCompatActivity) {
         val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return
@@ -69,6 +85,11 @@ object CloudReleaseManager {
 
     private fun hasAnnouncementContent(data: JSONObject): Boolean =
         data.optString("title").isNotBlank() || data.optString("content").isNotBlank() || data.optString("img_url").isNotBlank()
+
+    private fun announcementSignature(data: JSONObject): String {
+        val raw = "${data.optString("title")}|${data.optString("content")}|${data.optString("btnTitle")}|${data.optString("img_url")}"
+        return raw.hashCode().toString()
+    }
 
     private fun showAnnouncement(
         activity: AppCompatActivity,
