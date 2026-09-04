@@ -23,17 +23,28 @@ import com.github.kr328.clash.BuildConfig
 import com.github.kr328.clash.CloudUpdateActivity
 import com.github.kr328.clash.design.util.resolveThemedColor
 import com.google.android.material.button.MaterialButton
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 object CloudReleaseManager {
     private const val PREFS = "cloud_release"
     @Volatile private var updateDialogVisible = false
+    @Volatile private var launchCheckCompleted = false
+    @Volatile private var launchData: JSONObject? = null
+    private val launchCheckMutex = Mutex()
 
-    suspend fun checkOnLaunch(activity: AppCompatActivity): JSONObject? {
-        val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return null
+    suspend fun checkOnLaunch(activity: AppCompatActivity): JSONObject? = launchCheckMutex.withLock {
+        if (launchCheckCompleted) return@withLock launchData
+        val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return@withLock null
+        launchData = data
+        launchCheckCompleted = true
         showUpdate(activity, data)
-        return data
+        data
     }
+
+    fun hasUpdateOffer(data: JSONObject): Boolean =
+        data.optInt("forcedFlag", 0) in 1..2 && isRemoteNewer(BuildConfig.BRAND_VERSION_NAME, data.optString("version"))
 
     suspend fun announcementData(context: Context): JSONObject? =
         CloudApi(context).remoteConfig().optJSONObject("data")
@@ -239,7 +250,7 @@ object CloudReleaseManager {
         val flag = data.optInt("forcedFlag", 0)
         val remote = data.optString("version")
         val local = BuildConfig.BRAND_VERSION_NAME
-        if (flag !in 1..2 || !isRemoteNewer(local, remote)) return false
+        if (!hasUpdateOffer(data)) return false
         if (updateDialogVisible) return true
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed || updateDialogVisible) return@runOnUiThread

@@ -55,11 +55,13 @@ class CloudAuthActivity : AppCompatActivity() {
         window.navigationBarColor = backgroundColor()
         render()
         lifecycleScope.launch {
-            runCatching { CloudReleaseManager.announcementData(this@CloudAuthActivity) }.getOrNull()?.let { data ->
+            runCatching { CloudReleaseManager.checkOnLaunch(this@CloudAuthActivity) }.getOrNull()?.let { data ->
                 announcementData = data
                 val hasContent = data.optString("title").isNotBlank() || data.optString("content").isNotBlank() || data.optString("img_url").isNotBlank()
                 announcementEntry?.visibility = if (data.optInt("show", 0) in 1..2 && hasContent) View.VISIBLE else View.GONE
-                if (step == Step.LOGIN) CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, data, automatic = true)
+                if (step == Step.LOGIN && !CloudReleaseManager.hasUpdateOffer(data)) {
+                    CloudReleaseManager.showLoginAnnouncement(this@CloudAuthActivity, data, automatic = true)
+                }
             }
         }
     }
