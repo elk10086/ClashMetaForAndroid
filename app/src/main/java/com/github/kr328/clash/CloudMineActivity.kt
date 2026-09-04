@@ -334,17 +334,14 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun vipBanner(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(15), dp(12), dp(15), dp(12))
-        background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(
-            Color.parseColor("#3D2E24"), Color.parseColor("#63483D"), Color.parseColor("#BA987A"),
-        )).apply { cornerRadius = dp(8).toFloat() }
+        setPadding(dp(15), dp(15), dp(15), dp(15))
+        background = roundRect("#FFFFFF", 8, "#E0E0E0")
         isClickable = true; isFocusable = true; setOnClickListener { open("plans") }
         addView(vertical().apply {
             addView(TextView(this@CloudMineActivity).apply { text = "VIP会员"; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.NORMAL) })
-            expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(cloudColor("#212121")); setPadding(0, dp(2), 0, 0) }
+            expiryView = TextView(this@CloudMineActivity).apply { text = "到期时间：加载中…"; textSize = 11f; setTextColor(cloudColor("#757575")); setPadding(0, dp(2), 0, 0) }
             addView(expiryView)
         }, LinearLayout.LayoutParams(0, -2, 1f))
-        addView(ImageView(this@CloudMineActivity).apply { setImageResource(R.drawable.cloud_vip_mark); scaleType = ImageView.ScaleType.CENTER_INSIDE }, LinearLayout.LayoutParams(dp(82), dp(40)))
     }.also { it.layoutParams = LinearLayout.LayoutParams(-1, dp(77)).apply { topMargin = dp(17); bottomMargin = dp(20) } }
 
     private fun actionRow(title: String, emphasized: Boolean = false, customer: Boolean = false, leadingIcon: Int? = null, click: () -> Unit): View =
