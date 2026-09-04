@@ -49,14 +49,20 @@ object CloudReleaseManager {
     fun isDashboardAnnouncementUnread(context: Context, data: JSONObject): Boolean {
         val show = data.optInt("show", 0)
         if (show !in 1..2 || !hasAnnouncementContent(data)) return false
-        if (show == 2) return true
         return !context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getBoolean("dashboard_announcement_read_${announcementSignature(data)}", false)
     }
 
+    fun isDashboardAnnouncementVisible(context: Context, data: JSONObject): Boolean =
+        when (data.optInt("show", 0)) {
+            2 -> hasAnnouncementContent(data)
+            1 -> isDashboardAnnouncementUnread(context, data)
+            else -> false
+        }
+
     fun showDashboardAnnouncement(activity: AppCompatActivity, data: JSONObject, onRead: () -> Unit) {
         showAnnouncement(activity, data, automatic = false, openLink = false) {
-            if (data.optInt("show", 0) != 1) return@showAnnouncement
+            if (data.optInt("show", 0) !in 1..2) return@showAnnouncement
             activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putBoolean("dashboard_announcement_read_${announcementSignature(data)}", true)
                 .apply()

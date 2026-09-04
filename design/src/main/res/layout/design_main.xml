@@ -17,6 +17,7 @@
         <variable name="connectionTime" type="String" />
         <variable name="announcementTitle" type="String" />
         <variable name="announcementVisible" type="boolean" />
+        <variable name="announcementUnread" type="boolean" />
         <import type="com.github.kr328.clash.design.MainDesign.Request" />
         <import type="android.view.View" />
     </data>
@@ -90,12 +91,25 @@
                     android:paddingVertical="12dp"
                     android:visibility="@{announcementVisible ? View.VISIBLE : View.GONE}">
 
-                    <ImageView
-                        android:layout_width="24dp"
-                        android:layout_height="24dp"
-                        android:contentDescription="@string/cloud_announcement"
-                        android:src="@drawable/ic_cloud_announcement"
-                        android:tint="?attr/colorPrimary" />
+                    <FrameLayout
+                        android:layout_width="28dp"
+                        android:layout_height="28dp">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/cloud_announcement"
+                            android:src="@drawable/ic_cloud_announcement"
+                            android:tint="?attr/colorPrimary" />
+
+                        <View
+                            android:layout_width="8dp"
+                            android:layout_height="8dp"
+                            android:layout_gravity="top|end"
+                            android:background="@drawable/cloud_unread_dot"
+                            android:visibility="@{announcementUnread ? View.VISIBLE : View.GONE}" />
+                    </FrameLayout>
 
                     <TextView
                         android:layout_width="0dp"

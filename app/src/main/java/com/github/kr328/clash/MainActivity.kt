@@ -79,6 +79,7 @@ class MainActivity : BaseActivity<MainDesign>() {
                 announcementData = data
                 design.setAnnouncement(
                     data.optString("title").ifBlank { "公告" },
+                    CloudReleaseManager.isDashboardAnnouncementVisible(this@MainActivity, data),
                     CloudReleaseManager.isDashboardAnnouncementUnread(this@MainActivity, data),
                 )
             }
@@ -148,7 +149,13 @@ class MainActivity : BaseActivity<MainDesign>() {
                             startActivity(Intent(this@MainActivity, CloudBusinessActivity::class.java).putExtra("type", "plans"))
                         MainDesign.Request.OpenAnnouncement -> announcementData?.let { data ->
                             CloudReleaseManager.showDashboardAnnouncement(this@MainActivity, data) {
-                                launch { design.setAnnouncement("", false) }
+                                launch {
+                                    design.setAnnouncement(
+                                        data.optString("title").ifBlank { "公告" },
+                                        data.optInt("show", 0) == 2,
+                                        false,
+                                    )
+                                }
                             }
                         }
                         MainDesign.Request.DetectNetwork -> requestNetworkDetection(design)

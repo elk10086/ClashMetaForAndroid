@@ -98,10 +98,11 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         }
     }
 
-    suspend fun setAnnouncement(title: String, visible: Boolean) {
+    suspend fun setAnnouncement(title: String, visible: Boolean, unread: Boolean) {
         withContext(Dispatchers.Main) {
             binding.announcementTitle = "官方公告：$title"
             binding.announcementVisible = visible
+            binding.announcementUnread = unread
         }
     }
 
@@ -117,6 +118,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
         binding.cloudProgress = 0
         binding.announcementTitle = ""
         binding.announcementVisible = false
+        binding.announcementUnread = false
     }
 
     fun request(request: Request) {
