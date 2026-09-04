@@ -10,8 +10,11 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.util.TypedValue
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.github.kr328.clash.design.store.UiStore
 import com.github.kr328.clash.design.util.resolveThemedColor
 import com.github.kr328.clash.design.R as DesignR
 
@@ -100,12 +103,26 @@ object CloudBottomNavigation {
                 setPadding(dp(context, 20), dp(context, 4), dp(context, 20), dp(context, 4))
             }, LinearLayout.LayoutParams(dp(context, 64), dp(context, 32)))
             addView(TextView(context).apply {
+                val store = UiStore(context)
+                val skin = store.cloudThemeStyle.coerceIn(0, 3)
                 setText(label)
                 textSize = 12f
                 gravity = Gravity.CENTER
+                includeFontPadding = false
                 setTextColor(context.resolveThemedColor(if (active) com.google.android.material.R.attr.colorPrimary else com.google.android.material.R.attr.colorOnSurface))
                 alpha = if (active) 1f else .62f
-                if (active) setTypeface(typeface, Typeface.BOLD)
+                typeface = Typeface.create(ResourcesCompat.getFont(context, when (skin) {
+                    0 -> DesignR.font.skin_minimal
+                    1 -> DesignR.font.skin_sakura
+                    2 -> DesignR.font.skin_god
+                    else -> DesignR.font.skin_anime
+                }), if (active) Typeface.BOLD else Typeface.NORMAL)
+                textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
+                letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
+                if (store.cloudTextScaleEnabled) {
+                    setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
+                }
+                tag = "cloud_bottom_navigation_typography"
             }, LinearLayout.LayoutParams(-1, dp(context, 24)))
         }, LinearLayout.LayoutParams(0, -1, 1f))
     }
