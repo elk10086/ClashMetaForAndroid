@@ -341,7 +341,7 @@
     <string name="cloud_mode_global_desc">所有网站都走加速</string>
     <string name="cloud_mode_direct_desc">不走加速，全部像平时上网</string>
     <string name="cloud_dashboard_detection">网络检测</string>
-    <string name="cloud_dashboard_detection_hint">点击检测</string>
+    <string name="cloud_dashboard_auto_detecting">自动检测中…</string>
     <string name="cloud_dashboard_detecting">检测中…</string>
     <string name="cloud_dashboard_detection_failed">检测失败，点击重试</string>
     <string name="cloud_dashboard_detection_timeout">timeout</string>

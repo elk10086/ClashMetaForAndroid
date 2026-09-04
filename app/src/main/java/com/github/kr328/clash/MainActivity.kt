@@ -73,7 +73,7 @@ class MainActivity : BaseActivity<MainDesign>() {
 
         cloudSubscription = loadCachedCloudSubscription()
         design.fetch()
-        if (cachedNetworkResult == null) requestNetworkDetection(design)
+        if (cachedNetworkResult == null) requestNetworkDetection(design, automatic = true)
         launch {
             runCatching { CloudReleaseManager.checkOnLaunch(this@MainActivity) }.getOrNull()?.let { data ->
                 announcementData = data
@@ -196,7 +196,7 @@ class MainActivity : BaseActivity<MainDesign>() {
         syncConnectionClock()
         setClashRunning(clashRunning)
         setConnectionTime(formatConnectionTime())
-        setNetworkResult(cachedNetworkResult ?: getString(DesignR.string.cloud_dashboard_detection_hint))
+        setNetworkResult(cachedNetworkResult ?: getString(DesignR.string.cloud_dashboard_auto_detecting))
 
         val state = withClash {
             queryTunnelState()
@@ -438,11 +438,15 @@ class MainActivity : BaseActivity<MainDesign>() {
         return String.format(java.util.Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
-    private fun requestNetworkDetection(design: MainDesign, delayMillis: Long = 0L) {
+    private fun requestNetworkDetection(
+        design: MainDesign,
+        delayMillis: Long = 0L,
+        automatic: Boolean = false,
+    ) {
         networkDetectionJob?.cancel()
         networkDetectionJob = launch {
             if (delayMillis > 0) delay(delayMillis)
-            detectNetwork(design)
+            detectNetwork(design, automatic)
         }
     }
 
@@ -454,8 +458,13 @@ class MainActivity : BaseActivity<MainDesign>() {
         return true
     }
 
-    private suspend fun detectNetwork(design: MainDesign) {
-        design.setNetworkResult(getString(DesignR.string.cloud_dashboard_detecting))
+    private suspend fun detectNetwork(design: MainDesign, automatic: Boolean) {
+        design.setNetworkResult(
+            getString(
+                if (automatic) DesignR.string.cloud_dashboard_auto_detecting
+                else DesignR.string.cloud_dashboard_detecting,
+            ),
+        )
         val ipInfo = queryFirstIpInfo()
         val result = ipInfo?.let { (ip, country) ->
             listOf(countryFlag(country), ip).filter { it.isNotBlank() }.joinToString(" ")

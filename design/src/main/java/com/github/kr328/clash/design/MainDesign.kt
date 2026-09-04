@@ -186,7 +186,7 @@ class MainDesign(context: Context) : Design<MainDesign.Request>(context) {
 
     init {
         binding.self = this
-        binding.networkResult = context.getString(R.string.cloud_dashboard_detection_hint)
+        binding.networkResult = context.getString(R.string.cloud_dashboard_auto_detecting)
         binding.uploadSpeed = "0 Bytes/s"
         binding.downloadSpeed = "0 Bytes/s"
         binding.connectionTime = "00:00:00"

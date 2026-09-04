@@ -432,7 +432,7 @@
     <string name="cloud_mode_global_desc">Accelerate all websites</string>
     <string name="cloud_mode_direct_desc">No acceleration, browse as usual</string>
     <string name="cloud_dashboard_detection">Network detection</string>
-    <string name="cloud_dashboard_detection_hint">Tap to detect</string>
+    <string name="cloud_dashboard_auto_detecting">Detecting automatically…</string>
     <string name="cloud_dashboard_detecting">Detecting…</string>
     <string name="cloud_dashboard_detection_failed">Failed, tap to retry</string>
     <string name="cloud_dashboard_detection_timeout">timeout</string>
