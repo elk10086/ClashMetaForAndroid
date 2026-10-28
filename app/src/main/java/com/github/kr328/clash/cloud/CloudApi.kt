@@ -5,12 +5,13 @@ import android.net.Uri
 import android.util.Base64
 import com.github.kr328.clash.BuildConfig
 import com.github.kr328.clash.common.constants.ClientUserAgent
+import com.github.kr328.clash.common.util.firstSuccessfulHttp
+import com.github.kr328.clash.common.util.readCancellable
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -20,6 +21,7 @@ import java.net.URLEncoder
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.crypto.Cipher
+import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext
@@ -70,7 +72,13 @@ class CloudApi(private val context: Context) {
         if (!json.optBoolean("data", false)) throw CloudException(messageOf(json, "密码重置失败"))
     }
 
-    suspend fun subscription(): CloudSubscription = withContext(Dispatchers.IO) {
+    suspend fun subscription(forceRefresh: Boolean = false): CloudSubscription =
+        CloudSubscriptionCache.get(context, forceRefresh) { fetchSubscription() }
+
+    internal suspend fun refreshSubscriptionIfDue() =
+        CloudSubscriptionCache.refreshIfDue(context) { fetchSubscription() }
+
+    private suspend fun fetchSubscription(): CloudSubscription = withContext(Dispatchers.IO) {
         val json = request("GET", "/api/v1/user/getSubscribe", authenticated = true)
         val data = requireData(json)
         val plan = data.optJSONObject("plan")?.optString("name").orEmpty()
@@ -101,9 +109,21 @@ class CloudApi(private val context: Context) {
         "/api/v1/user/coupon/check",
         mapOf("code" to code, "plan_id" to planId),
     )
-    suspend fun inviteSummary(): JSONObject = authenticatedGet("/api/v1/user/invite/fetch")
+    private suspend fun inviteSummary(): JSONObject = authenticatedGet("/api/v1/user/invite/fetch")
+    internal suspend fun inviteSummaryWithCode(): CloudInviteSummary {
+        val auth = session.authData
+        val email = session.email
+        return CloudInviteCodes.ensure(
+            fetch = { inviteSummary() },
+            create = { createInviteCode(); Unit },
+            isCurrentSession = { auth.isNotBlank() && session.authData == auth && session.email == email },
+        )
+    }
     suspend fun inviteDetails(): JSONObject = authenticatedGet("/api/v1/user/invite/details")
-    suspend fun createInviteCode(): JSONObject = authenticatedGet("/api/v1/user/invite/save")
+    private suspend fun createInviteCode(): JSONObject = withContext(Dispatchers.IO) {
+        // This GET mutates server state; never replay it on another origin after a timeout.
+        request("GET", "/api/v1/user/invite/save", authenticated = true, allowRecovery = false)
+    }
     suspend fun transferCommission(amount: Long): JSONObject = authenticatedPost(
         "/api/v1/user/transfer",
         mapOf("transfer_amount" to amount.toString()),
@@ -117,19 +137,32 @@ class CloudApi(private val context: Context) {
 
     fun clearRemoteConfigCache() {
         prefs.edit().remove("base_url").apply()
+        remoteConfigGeneration.incrementAndGet()
     }
 
     suspend fun remoteConfig(): JSONObject = withContext(Dispatchers.IO) {
-        val urls = configUrls.take(3).shuffled() + configUrls.drop(3)
-        urls.mapNotNull { url -> runCatching { readConfigDocument(url) }.getOrNull() }
-            .firstOrNull { it.optJSONObject("data") != null }
-            ?: throw CloudException("远端配置不可用")
+        remoteConfigMutex.withLock {
+            val generation = remoteConfigGeneration.get()
+            cachedRemoteConfig?.takeIf {
+                it.generation == generation && System.nanoTime() - it.loadedAt < 60_000_000_000L
+            }?.let { return@withLock JSONObject(it.json) }
+            // Race primary mirrors; only use the final fallback if all primaries fail.
+            val urls = configUrls.distinct()
+            suspend fun fetch(candidates: List<String>) = firstSuccessfulHttp(candidates) {
+                readConfigDocument(it).takeIf { json -> json.optJSONObject("data") != null }
+            }
+            val result = fetch(urls.take(3)) ?: fetch(urls.drop(3))
+                ?: throw CloudException("远端配置不可用")
+            cachedRemoteConfig = RemoteConfigSnapshot(result.toString(), System.nanoTime(), generation)
+            result
+        }
     }
 
     /** free_time_new order: remembered origin -> subDomains -> subUrl -> API subscribe_url. */
     suspend fun subscriptionUrls(subscribeUrl: String): List<String> = withContext(Dispatchers.IO) {
         val original = validHttpUri(subscribeUrl) ?: return@withContext emptyList()
         val data = runCatching { remoteConfig().optJSONObject("data") }.getOrNull()
+        updateDdnsConfiguration(data)
         val bases = mutableListOf<String>()
         prefs.getString("subscription_domain", "")?.let(bases::add)
         data?.optJSONArray("subDomains")?.let { array ->
@@ -141,6 +174,11 @@ class CloudApi(private val context: Context) {
             bases.forEach { base -> rewriteUrlBase(original, base)?.let { if (it !in this) add(it) } }
             original.toString().let { if (it !in this) add(it) }
         }
+    }
+
+    suspend fun refreshDdnsConfiguration(): Boolean = withContext(Dispatchers.IO) {
+        val data = runCatching { remoteConfig().optJSONObject("data") }.getOrNull() ?: return@withContext false
+        updateDdnsConfiguration(data)
     }
 
     fun rememberSuccessfulSubscriptionUrl(url: String) {
@@ -192,6 +230,7 @@ class CloudApi(private val context: Context) {
         path: String,
         params: Map<String, String> = emptyMap(),
         authenticated: Boolean = false,
+        allowRecovery: Boolean = true,
     ): JSONObject {
         var base = selectBaseUrl(forceRefresh = false)
         var recoveryUsed = false
@@ -205,7 +244,7 @@ class CloudApi(private val context: Context) {
                     session.clear()
                     throw CloudException("登录已失效，请重新登录")
                 }
-                if (recoveryUsed || !isRecoverableBaseUrlFailure(e, authenticated)) {
+                if (!allowRecovery || recoveryUsed || !isRecoverableBaseUrlFailure(e, authenticated)) {
                     throw if (e is CloudException) e else CloudException(e.message ?: "暂时无法连接服务")
                 }
                 recoveryUsed = true
@@ -263,12 +302,9 @@ class CloudApi(private val context: Context) {
                 add(fallback)
             }.filter { validHttpUri(it) != null && origin(Uri.parse(it)) !in excludedOrigins }.distinct()
 
-            val reachable = coroutineScope {
-                candidates.map { candidate ->
-                    async(Dispatchers.IO) { candidate.takeIf { probeBaseUrl(it) } }
-                }.awaitAll().filterNotNull()
+            val selected = firstSuccessfulHttp(candidates) { candidate ->
+                candidate.takeIf { probeBaseUrl(it) }
             }
-            val selected = reachable.randomOrNull()
                 ?: fallback.takeIf { it.isNotBlank() && excludedOrigins.isEmpty() }
                 ?: throw CloudException("没有可用的登录域名")
             prefs.edit().putString("base_url", selected).apply()
@@ -278,14 +314,14 @@ class CloudApi(private val context: Context) {
         }
     }
 
-    private fun probeBaseUrl(base: String): Boolean {
+    private suspend fun probeBaseUrl(base: String): Boolean {
         val connection = cloudConnection("${base.trimEnd('/')}/api/v1/guest/comm/config")
         connection.connectTimeout = 12_000
         connection.readTimeout = 10_000
         connection.setRequestProperty("Accept", "application/json")
         connection.setRequestProperty("User-Agent", ClientUserAgent.value(context))
-        return try {
-            if (connection.responseCode !in 200..299) return false
+        return connection.readCancellable {
+            if (connection.responseCode !in 200..299) return@readCancellable false
             val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
             when (val data = json.opt("data")) {
                 is JSONObject -> data.length() > 0
@@ -295,10 +331,6 @@ class CloudApi(private val context: Context) {
                 is String -> data.isNotBlank()
                 else -> json.optString("message").equals("success", true) || json.optString("status") in setOf("success", "1")
             }
-        } catch (_: Throwable) {
-            false
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -325,17 +357,15 @@ class CloudApi(private val context: Context) {
     private fun normalizeBaseUrl(value: String) = value.trim().trimEnd('/')
     private fun origin(uri: Uri): String = "${uri.scheme!!.lowercase()}://${uri.host!!.lowercase()}${if (uri.port >= 0) ":${uri.port}" else ""}"
 
-    private fun readConfigDocument(url: String): JSONObject {
+    private suspend fun readConfigDocument(url: String): JSONObject {
         val connection = cloudConnection(url)
         connection.connectTimeout = 10_000
         connection.readTimeout = 10_000
         connection.setRequestProperty("User-Agent", ClientUserAgent.value(context))
-        return try {
+        return connection.readCancellable {
             val raw = connection.inputStream.bufferedReader().use { it.readText() }.trim().trim('"')
             val text = if (raw.startsWith("{")) raw else decryptConfig(raw)
             JSONObject(text)
-        } finally {
-            connection.disconnect()
         }
     }
 
@@ -343,6 +373,93 @@ class CloudApi(private val context: Context) {
         val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec("fastflyfly@789.!".toByteArray(), "AES"))
         return String(cipher.doFinal(Base64.decode(value, Base64.DEFAULT)))
+    }
+
+    private fun updateDdnsConfiguration(data: JSONObject?): Boolean {
+        val stateFile = context.filesDir.resolve("ddns-config.json")
+        val enabled = data?.opt("enableDdns").let {
+            it == true || it == 1 || it?.toString()?.equals("true", ignoreCase = true) == true
+        }
+        if (!enabled) {
+            return writeDdnsConfiguration(stateFile, JSONObject().put("enabled", false))
+        }
+
+        val protocols = data?.optJSONArray("replaceNodeDomainProtocols")
+            ?: data?.optJSONArray("replace_node_domain_protocols")
+            ?: data?.optJSONArray("nodeDomainReplaceProtocols")
+            ?: data?.optJSONArray("node_domain_replace_protocols")
+        val protocolValues = org.json.JSONArray()
+        if (protocols != null) {
+            for (index in 0 until protocols.length()) {
+                protocols.optString(index).trim().takeIf(String::isNotEmpty)?.let(protocolValues::put)
+            }
+        }
+        // As in free_time_new, an empty whitelist must never enable unrestricted replacement.
+        if (protocolValues.length() == 0) {
+            return writeDdnsConfiguration(stateFile, JSONObject().put("enabled", false))
+        }
+
+        val customUrl = data?.optString("ddnsDomainsUrl").orEmpty().ifBlank {
+            data?.optString("ddns_domains_url").orEmpty()
+        }.trim()
+        val endpoint = validHttpUri(customUrl)?.toString() ?: DEFAULT_DDNS_DOMAINS_URL
+        val mapping = runCatching { readDdnsDomainMap(endpoint) }.getOrNull() ?: return false
+        return writeDdnsConfiguration(
+            stateFile,
+            JSONObject().put("enabled", true).put("protocols", protocolValues).put("mapping", mapping),
+        )
+    }
+
+    private fun readDdnsDomainMap(url: String): JSONObject {
+        val connection = cloudConnection(url)
+        connection.connectTimeout = 10_000
+        connection.readTimeout = 10_000
+        connection.setRequestProperty("Accept", "application/json")
+        connection.setRequestProperty("User-Agent", ClientUserAgent.value(context))
+        return try {
+            if (connection.responseCode !in 200..299) throw IOException("DDNS request failed")
+            val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+            val data = root.optJSONObject("data")
+            val payload = if (data?.has("nonce") == true && data.has("ciphertext")) {
+                val nonce = Base64.decode(data.getString("nonce"), Base64.DEFAULT)
+                val ciphertext = Base64.decode(data.getString("ciphertext"), Base64.DEFAULT)
+                require(nonce.size == 12) { "Invalid DDNS nonce" }
+                val key = Base64.decode(DDNS_AES_KEY, Base64.DEFAULT)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding")
+                cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, nonce))
+                JSONObject(String(cipher.doFinal(ciphertext), Charsets.UTF_8))
+            } else {
+                data ?: root.optJSONObject("domains") ?: throw IOException("Invalid DDNS response")
+            }
+            JSONObject().also { output ->
+                payload.keys().forEach { key ->
+                    val normalizedKey = key.trim().lowercase()
+                    val raw = payload.opt(key)
+                    val value = when (raw) {
+                        is org.json.JSONArray -> buildList {
+                            for (index in 0 until raw.length()) raw.optString(index).trim()
+                                .takeIf(String::isNotEmpty)?.let(::add)
+                        }.joinToString(",")
+                        else -> raw?.toString()?.trim().orEmpty()
+                    }
+                    if (normalizedKey.isNotEmpty() && value.isNotEmpty()) output.put(normalizedKey, value)
+                }
+            }.also { require(it.length() > 0) { "Empty DDNS mapping" } }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun writeDdnsConfiguration(file: java.io.File, value: JSONObject): Boolean {
+        val content = value.toString()
+        if (runCatching { file.readText() }.getOrNull() == content) return false
+        val temporary = java.io.File(file.parentFile, "${file.name}.tmp")
+        temporary.writeText(content)
+        if (!temporary.renameTo(file)) {
+            file.writeText(content)
+            temporary.delete()
+        }
+        return true
     }
 
     private fun requireData(json: JSONObject): JSONObject = json.optJSONObject("data")
@@ -365,6 +482,13 @@ class CloudApi(private val context: Context) {
     private class HttpStatusException(val code: Int, message: String) : IOException(message)
 
     companion object {
+        private data class RemoteConfigSnapshot(val json: String, val loadedAt: Long, val generation: Long)
+        private val remoteConfigMutex = Mutex()
+        private val remoteConfigGeneration = AtomicLong()
+        private var cachedRemoteConfig: RemoteConfigSnapshot? = null
+        private const val DEFAULT_DDNS_DOMAINS_URL =
+            "https://fzzzznn.dibiaozuiqiangddnsdomain.top/api/v1/ddns/domains"
+        private const val DDNS_AES_KEY = "XhITVtnWA+advZ9tM0sInHGRjfreLAX5FPTGc0qvPFU="
         private val baseUrlSelectionMutex = Mutex()
         private val cloudSslSocketFactory by lazy {
             val trustManager = object : X509TrustManager {

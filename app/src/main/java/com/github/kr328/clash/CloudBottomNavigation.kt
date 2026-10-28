@@ -2,7 +2,7 @@ package com.github.kr328.clash
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Typeface
+import com.github.kr328.clash.design.util.ThemeTypography
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -10,8 +10,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.util.TypedValue
-import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.github.kr328.clash.design.store.UiStore
@@ -61,6 +59,8 @@ object CloudBottomNavigation {
     }
 
     fun open(activity: Activity, tab: Tab) {
+        if (tab == Tab.PROFILES && !activity.canViewConfigurationModule()) return
+
         val target = when (tab) {
             Tab.DASHBOARD -> MainActivity::class.java
             Tab.LINES -> ProxyActivity::class.java
@@ -71,7 +71,9 @@ object CloudBottomNavigation {
         activity.startActivity(
             Intent(activity, target).addFlags(
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
-            ),
+            // Bottom-tab navigation is a standalone lines page. Only the
+            // dashboard's line card sets this flag through MainActivity.openPrimary.
+            ).putExtra(ProxyActivity.EXTRA_RETURN_TO_DASHBOARD, false),
         )
         @Suppress("DEPRECATION")
         activity.overridePendingTransition(0, 0)
@@ -84,7 +86,9 @@ object CloudBottomNavigation {
         setBackgroundColor(activity.resolveThemedColor(com.google.android.material.R.attr.colorSurface))
         add(Tab.DASHBOARD, DesignR.string.cloud_nav_dashboard, DesignR.drawable.cloud_nav_dashboard, selected == Tab.DASHBOARD)
         add(Tab.LINES, DesignR.string.cloud_nav_lines, DesignR.drawable.cloud_nav_lines, selected == Tab.LINES)
-        add(Tab.PROFILES, DesignR.string.cloud_nav_profiles, DesignR.drawable.cloud_nav_profiles, selected == Tab.PROFILES)
+        if (activity.canViewConfigurationModule()) {
+            add(Tab.PROFILES, DesignR.string.cloud_nav_profiles, DesignR.drawable.cloud_nav_profiles, selected == Tab.PROFILES)
+        }
         add(Tab.MINE, DesignR.string.cloud_nav_mine, DesignR.drawable.cloud_nav_mine, selected == Tab.MINE)
     }
 
@@ -111,17 +115,14 @@ object CloudBottomNavigation {
                 includeFontPadding = false
                 setTextColor(context.resolveThemedColor(if (active) com.google.android.material.R.attr.colorPrimary else com.google.android.material.R.attr.colorOnSurface))
                 alpha = if (active) 1f else .62f
-                typeface = Typeface.create(ResourcesCompat.getFont(context, when (skin) {
-                    0 -> DesignR.font.skin_minimal
-                    1 -> DesignR.font.skin_sakura
-                    2 -> DesignR.font.skin_god
-                    else -> DesignR.font.skin_anime
-                }), if (active) Typeface.BOLD else Typeface.NORMAL)
-                textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
-                letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
-                if (store.cloudTextScaleEnabled) {
-                    setTextSize(TypedValue.COMPLEX_UNIT_PX, textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
+                typeface = ThemeTypography.typeface(context, emphasis = active)
+                if (skin == 1) {
+                    setTextColor(context.resolveThemedColor(if (active)
+                        com.google.android.material.R.attr.colorPrimary else
+                        com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    alpha = 1f
                 }
+                ThemeTypography.apply(this)
                 tag = "cloud_bottom_navigation_typography"
             }, LinearLayout.LayoutParams(-1, dp(context, 24)))
         }, LinearLayout.LayoutParams(0, -1, 1f))

@@ -9,14 +9,15 @@ import android.os.Build
 import com.github.kr328.clash.common.compat.pendingIntentFlags
 import com.github.kr328.clash.common.constants.Components
 import com.github.kr328.clash.common.log.Log
+import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.service.clash.clashRuntime
 import com.github.kr328.clash.service.clash.module.*
 import com.github.kr328.clash.service.model.AccessControlMode
 import com.github.kr328.clash.service.store.ServiceStore
-import com.github.kr328.clash.service.util.cancelAndJoinBlocking
 import com.github.kr328.clash.service.util.parseCIDR
 import com.github.kr328.clash.service.util.sendClashStarted
 import com.github.kr328.clash.service.util.sendClashStopped
+import com.github.kr328.clash.service.util.ServiceStopReceiver
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
 
@@ -25,32 +26,38 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
         get() = this
 
     private var reason: String? = null
+    private var ownsRuntime = false
+    private val stopReceiver = ServiceStopReceiver(this, ::requestStop)
 
     private val runtime = clashRuntime {
         val store = ServiceStore(self)
 
-        val close = install(CloseModule(self))
-        val tun = install(TunModule(self))
-        val config = install(ConfigurationModule(self))
-        val network = install(NetworkObserveModule(self))
-
-        if (store.dynamicNotification)
-            install(DynamicNotificationModule(self))
-        else
-            install(StaticNotificationModule(self))
-
-        install(AppListCacheModule(self))
-        install(TimeZoneModule(self))
-        install(SuspendModule(self))
-
+        val tun = TunModule(self)
         try {
+            val config = install(ConfigurationModule(self))
+            val network = install(NetworkObserveModule(self))
+
+            if (store.dynamicNotification)
+                install(DynamicNotificationModule(self))
+            else
+                install(StaticNotificationModule(self))
+
+            install(AppListCacheModule(self))
+            install(TimeZoneModule(self))
+            install(SuspendModule(self))
+
+            config.awaitReady()
+            currentCoroutineContext().ensureActive()
             tun.open()
+            currentCoroutineContext().ensureActive()
+            Log.i("TunService: tunnel ready after profile and selections restored")
+            // Keep READY/STOPPED broadcasts ordered with Android lifecycle callbacks.
+            withContext(Dispatchers.Main) {
+                if (this@TunService.isActive && ownsRuntime) sendClashStarted()
+            }
 
             while (isActive) {
                 val quit = select<Boolean> {
-                    close.onEvent {
-                        true
-                    }
                     config.onEvent {
                         reason = it.message
 
@@ -67,6 +74,8 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
 
                 if (quit) break
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("Create clash runtime: ${e.message}", e)
 
@@ -75,7 +84,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             withContext(NonCancellable) {
                 tun.close()
 
-                stopSelf()
+                if (this@TunService.isActive) stopSelf()
             }
         }
     }
@@ -83,35 +92,52 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
     override fun onCreate() {
         super.onCreate()
 
+        // Every startForegroundService request must be acknowledged, even duplicates.
+        StaticNotificationModule.createNotificationChannel(this)
+        StaticNotificationModule.notifyLoadingNotification(this)
+
         if (StatusProvider.serviceRunning)
             return stopSelf()
 
+        ownsRuntime = true
         StatusProvider.serviceRunning = true
-
-        StaticNotificationModule.createNotificationChannel(this)
-        StaticNotificationModule.notifyLoadingNotification(this)
+        stopReceiver.register()
+        stopService(PreviewService::class.intent)
 
         runtime.launch()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        sendClashStarted()
+        StaticNotificationModule.notifyLoadingNotification(this)
+        if (ownsRuntime && isActive) sendClashStarted() else stopSelf(startId)
 
         return super.onStartCommand(intent, flags, startId)
     }
 
     override fun onDestroy() {
-        TunModule.requestStop()
-
-        StatusProvider.serviceRunning = false
-
-        sendClashStopped(reason)
-
-        cancelAndJoinBlocking()
+        // The runtime's finally closes native resources on its dispatcher, under the
+        // handover lock. Doing it here can block the next service's foreground deadline.
+        cancel()
+        stopReceiver.unregister()
+        if (ownsRuntime) {
+            StatusProvider.serviceRunning = false
+            sendClashStopped(reason)
+        }
 
         Log.i("TunService destroyed: ${reason ?: "successfully"}")
 
         super.onDestroy()
+    }
+
+    private fun requestStop() {
+        // Cancellation starts tunnel cleanup even while Android still binds this VPN.
+        cancel()
+        stopSelf()
+    }
+
+    override fun onRevoke() {
+        Log.i("TunService: VPN permission revoked")
+        requestStop()
     }
 
     override fun onTrimMemory(level: Int) {
@@ -175,7 +201,7 @@ class TunService : VpnService(), CoroutineScope by CoroutineScope(Dispatchers.De
             setMtu(TUN_MTU)
 
             // Session Name
-            setSession("Clash")
+            setSession(getString(R.string.clash_meta_for_android))
 
             // Virtual Dns Server
             addDnsServer(TUN_DNS)

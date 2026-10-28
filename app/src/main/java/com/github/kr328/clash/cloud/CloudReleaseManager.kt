@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import com.github.kr328.clash.design.util.ThemeTypography
+import com.github.kr328.clash.design.util.ClientVersion
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
@@ -19,12 +21,14 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
 import com.github.kr328.clash.BuildConfig
 import com.github.kr328.clash.CloudUpdateActivity
 import com.github.kr328.clash.design.util.resolveThemedColor
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 object CloudReleaseManager {
@@ -33,14 +37,76 @@ object CloudReleaseManager {
     @Volatile private var launchCheckCompleted = false
     @Volatile private var launchData: JSONObject? = null
     private val launchCheckMutex = Mutex()
+    private var announcementDialogVisible = false
+    private var announcementRetryAfter = 0L
+    private const val ANNOUNCEMENT_INTERVAL = 24 * 60 * 60 * 1000L
+    private const val ANNOUNCEMENT_RETRY = 15 * 60 * 1000L
 
     suspend fun checkOnLaunch(activity: AppCompatActivity): JSONObject? = launchCheckMutex.withLock {
         if (launchCheckCompleted) return@withLock launchData
         val data = CloudApi(activity).remoteConfig().optJSONObject("data") ?: return@withLock null
         launchData = data
+        cacheAnnouncement(activity, data)
         launchCheckCompleted = true
         showUpdate(activity, data)
         data
+    }
+
+    private fun cacheAnnouncement(context: Context, data: JSONObject) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("announcement_data", data.toString())
+            .putLong("announcement_checked_at", System.currentTimeMillis())
+            .apply()
+        announcementRetryAfter = 0L
+    }
+
+    /** One daily configuration request supplies both announcements and updates. */
+    suspend fun refreshDashboardRelease(context: Context): JSONObject? = launchCheckMutex.withLock {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val cached = runCatching { JSONObject(prefs.getString("announcement_data", "").orEmpty()) }.getOrNull()
+        val now = System.currentTimeMillis()
+        val age = now - prefs.getLong("announcement_checked_at", 0L)
+        if (cached != null && age >= 0 && age < ANNOUNCEMENT_INTERVAL) return@withLock cached
+        if (now < announcementRetryAfter) return@withLock cached
+        try {
+            val data = CloudApi(context).remoteConfig().optJSONObject("data")
+                ?: error("Missing release configuration")
+            cacheAnnouncement(context, data)
+            data
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            announcementRetryAfter = now + ANNOUNCEMENT_RETRY
+            cached
+        }
+    }
+
+    private fun updatePromptKey(data: JSONObject): String =
+        "update_prompted_${data.optString("version").trim()}_${data.optInt("forcedFlag", 0)}"
+
+    fun showDashboardUpdate(activity: AppCompatActivity, data: JSONObject) {
+        if (!hasUpdateOffer(data) || activity.isFinishing || activity.isDestroyed ||
+            !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
+            updateDialogVisible || announcementDialogVisible) return
+        val lastPrompt = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getLong(updatePromptKey(data), 0L)
+        val elapsed = System.currentTimeMillis() - lastPrompt
+        // The local 30-second poll must not repeatedly show a dismissed offer.
+        // A new version or a change to forced updating gets a separate prompt.
+        if (lastPrompt > 0 && elapsed >= 0 && elapsed < ANNOUNCEMENT_INTERVAL) return
+        showUpdate(activity, data)
+    }
+
+    fun showNewDashboardAnnouncement(activity: AppCompatActivity, data: JSONObject, onRead: () -> Unit) {
+        if (data.optInt("show", 0) != 2 || !hasAnnouncementContent(data)) return
+        if (!isDashboardAnnouncementUnread(activity, data)) return
+        if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) ||
+            activity.isFinishing || activity.isDestroyed || updateDialogVisible || announcementDialogVisible) return
+        val prefs = activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val key = "dashboard_announcement_prompted_${announcementSignature(data)}"
+        if (prefs.getBoolean(key, false)) return
+        prefs.edit().putBoolean(key, true).apply()
+        showDashboardAnnouncement(activity, data, onRead)
     }
 
     fun hasUpdateOffer(data: JSONObject): Boolean =
@@ -136,7 +202,8 @@ object CloudReleaseManager {
         val content = data.optString("content").trim()
         if (!hasAnnouncementContent(data)) return
         activity.runOnUiThread {
-            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            if (activity.isFinishing || activity.isDestroyed || announcementDialogVisible || updateDialogVisible) return@runOnUiThread
+            announcementDialogVisible = true
             showCardDialog(
                 activity = activity,
                 title = title.ifBlank { "公告" },
@@ -144,7 +211,10 @@ object CloudReleaseManager {
                 closeDescription = "关闭公告",
                 showClose = true,
                 cancelable = true,
-                onDismiss = onDismiss,
+                onDismiss = {
+                    announcementDialogVisible = false
+                    onDismiss?.invoke()
+                },
             )
         }
     }
@@ -270,6 +340,7 @@ object CloudReleaseManager {
         secondary?.setOnClickListener { dialog.dismiss() }
         primaryAction?.setOnClickListener { if (onPrimary?.invoke() == true) dialog.dismiss() }
         dialog.setOnShowListener {
+            dialog.window?.decorView?.let(ThemeTypography::install)
             val width = (activity.resources.displayMetrics.widthPixels - dp(40)).coerceAtMost(dp(480))
             dialog.window?.apply {
                 setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
@@ -289,10 +360,12 @@ object CloudReleaseManager {
         activity.runOnUiThread {
             if (activity.isFinishing || activity.isDestroyed || updateDialogVisible) return@runOnUiThread
             updateDialogVisible = true
+            activity.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putLong(updatePromptKey(data), System.currentTimeMillis()).apply()
             showCardDialog(
                 activity = activity,
                 title = if (flag == 2) "版本更新" else "有新版本啦",
-                content = "最新版本：${remote.removePrefix("v")}\n当前版本：$local\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}",
+                content = "最新版本：${ClientVersion.display(remote)}\n当前版本：${ClientVersion.display(local)}\n\n${data.optString("versionIntroduction").ifBlank { "暂无更新说明" }}",
                 primaryLabel = "立即更新",
                 closeDescription = "关闭更新提示",
                 showClose = flag != 2,
@@ -339,20 +412,56 @@ object CloudReleaseManager {
 
     /** Matches free_time_new: the detail page also exposes every non-current platform address. */
     private fun otherPlatformUrls(data: JSONObject): JSONObject = JSONObject().apply {
-        data.optString("updateAddress_ios").trim().takeIf(String::isNotEmpty)?.let { put("iOS", it) }
-        pickArchitectureUrl(
-            data.optString("updateAddress_windows").trim(),
-            data.optString("updateAddress_windows_arm64").trim(),
-            data.optString("updateAddress_windows_x64").trim(),
-        ).takeIf(String::isNotEmpty)?.let { put("Windows", it) }
-        val macGeneric = data.optString("updateAddress_mac").trim()
+        firstNonBlank(
+            data,
+            "updateAddress_ios",
+            "updateAddressIos",
+        ).takeIf(String::isNotEmpty)?.let { put("iOS", it) }
+
+        val macGeneric = firstNonBlank(data, "updateAddress_mac", "updateAddressMac")
         val macCombined = parseMacCombinedUrls(macGeneric)
         pickArchitectureUrl(
             macGeneric,
-            data.optString("updateAddress_mac_arm64").trim().ifBlank { macCombined.first },
-            data.optString("updateAddress_mac_x64").trim().ifBlank { macCombined.second },
+            firstNonBlank(
+                data,
+                "updateAddress_mac_arm64",
+                "updateAddressMacArm64",
+                "updateAddress_mac_apple",
+                "updateAddressMacApple",
+            ).ifBlank { macCombined.first },
+            firstNonBlank(
+                data,
+                "updateAddress_mac_x64",
+                "updateAddressMacX64",
+                "updateAddress_mac_intel",
+                "updateAddressMacIntel",
+                "updateAddress_mac_microsoft",
+                "updateAddressMacMicrosoft",
+            ).ifBlank { macCombined.second },
         ).takeIf(String::isNotEmpty)?.let { put("macOS", it) }
+
+        pickArchitectureUrl(
+            firstNonBlank(data, "updateAddress_windows", "updateAddressWindows"),
+            firstNonBlank(
+                data,
+                "updateAddress_windows_arm64",
+                "updateAddressWindowsArm64",
+            ),
+            firstNonBlank(
+                data,
+                "updateAddress_windows_x64",
+                "updateAddressWindowsX64",
+                "updateAddress_windows_microsoft",
+                "updateAddressWindowsMicrosoft",
+            ),
+        ).takeIf(String::isNotEmpty)?.let { put("Windows", it) }
     }
+
+    private fun firstNonBlank(data: JSONObject, vararg keys: String): String =
+        keys.asSequence()
+            .map { data.optString(it).trim() }
+            .firstOrNull(String::isNotEmpty)
+            .orEmpty()
 
     private fun pickArchitectureUrl(generic: String, arm64: String, x64: String): String {
         val isArm64 = Build.SUPPORTED_ABIS.any { it.contains("arm64", true) || it.contains("aarch64", true) }

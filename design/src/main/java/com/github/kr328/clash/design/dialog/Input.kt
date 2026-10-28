@@ -63,8 +63,9 @@ suspend fun Context.requestModelTextInput(
         }
 
         dialog.setOnShowListener {
+            dialog.window?.decorView?.let(ThemeTypography::install)
             if (hint != null)
-                binding.textLayout.hint = hint
+                binding.textLayout.hint = hint.compactInputHint(this)
 
             binding.textField.apply {
                 binding.textLayout.isErrorEnabled = error != null

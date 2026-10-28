@@ -2,7 +2,7 @@ package com.github.kr328.clash.cloud
 
 import android.content.Context
 
-class CloudSession(context: Context) {
+class CloudSession(private val context: Context) {
     private val prefs = context.getSharedPreferences("cloud_session", Context.MODE_PRIVATE)
 
     val loggedIn: Boolean get() = authData.isNotBlank()
@@ -14,6 +14,7 @@ class CloudSession(context: Context) {
         set(value) { prefs.edit().putString("profile_uuid", value).apply() }
 
     fun save(email: String, token: String, authData: String) {
+        CloudSubscriptionCache.clear(context)
         prefs.edit()
             .putString("email", email.trim().lowercase())
             .putString("token", token)
@@ -23,5 +24,6 @@ class CloudSession(context: Context) {
 
     fun clear() {
         prefs.edit().clear().apply()
+        CloudSubscriptionCache.clear(context)
     }
 }

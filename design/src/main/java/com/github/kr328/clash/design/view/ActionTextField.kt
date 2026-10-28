@@ -9,6 +9,7 @@ import androidx.annotation.StyleRes
 import com.github.kr328.clash.design.R
 import com.github.kr328.clash.design.databinding.ComponentActionTextFieldBinding
 import com.github.kr328.clash.design.util.layoutInflater
+import com.github.kr328.clash.design.util.compactInputHint
 
 class ActionTextField @JvmOverloads constructor(
     context: Context,
@@ -43,7 +44,7 @@ class ActionTextField @JvmOverloads constructor(
     var placeholder: CharSequence?
         get() = binding.textView.hint
         set(value) {
-            binding.textView.hint = value
+            binding.textView.hint = value?.compactInputHint(context)
         }
 
     override fun setEnabled(enabled: Boolean) {

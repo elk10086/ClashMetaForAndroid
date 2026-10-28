@@ -145,6 +145,10 @@ subprojects {
                     applicationId = appId
                     versionName = brandVersionName
                     versionCode = brandVersionCode
+                    // Brand applications own the user-facing release identity.
+                    // Do not leave manifest metadata on the generic CMFA defaults.
+                    resValue("string", "release_name", "v$brandVersionName")
+                    resValue("integer", "release_code", "$brandVersionCode")
                     resValue("string", "launch_name", displayName)
                     resValue("string", "application_name", displayName)
                     buildConfigField("String", "BRAND_ID", "\"$id\"")
@@ -159,7 +163,7 @@ subprojects {
 
                 create("zy") {
                     brandConfig(
-                        "zy", "ZY", "com.flutterfly.zhuiyun", "6.6.3", 2026080401,
+                        "zy", "ZY", "com.flutterfly.zhuiyun", "6.6.5", 2026081002,
                         "https://www.zhuiyunjiasu.xyz", "www.zhuiyunjiasu.xyz",
                         "https://go.crisp.chat/chat/embed/?website_id=45c82007-8e52-44e6-8ded-31db17a83c4f",
                         "https://t.me/zhuiyunjiasu666",
@@ -168,7 +172,7 @@ subprojects {
                 }
                 create("fly") {
                     brandConfig(
-                        "fastfly", "Fastfly", "com.flutterfly.fastfly", "2.6.3", 2026074301,
+                        "fastfly", "Fastfly", "com.flutterfly.fastfly", "2.6.5", 2026074301,
                         "https://fastfly.club", "fastfly.club",
                         "https://go.crisp.chat/chat/embed/?website_id=36c7c66a-f768-4354-9823-5aaefec60c81",
                         "https://t.me/fastflyclub",
@@ -280,8 +284,14 @@ subprojects {
         }
 
         compileOptions {
-            sourceCompatibility = JavaVersion.VERSION_21
-            targetCompatibility = JavaVersion.VERSION_21
+            sourceCompatibility = JavaVersion.VERSION_17
+            targetCompatibility = JavaVersion.VERSION_17
+        }
+    }
+
+    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
         }
     }
 }

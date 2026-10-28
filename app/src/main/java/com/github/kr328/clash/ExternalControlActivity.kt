@@ -30,6 +30,8 @@ class ExternalControlActivity : Activity(), CoroutineScope by MainScope() {
 
         when(intent.action) {
             Intent.ACTION_VIEW -> {
+                if (!canViewConfigurationModule()) return finish()
+
                 val uri = intent.data ?: return finish()
                 val url = uri.getQueryParameter("url") ?: return finish()
 

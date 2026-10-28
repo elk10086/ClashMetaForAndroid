@@ -19,6 +19,8 @@ class PropertiesActivity : BaseActivity<PropertiesDesign>() {
     private lateinit var original: Profile
 
     override suspend fun main() {
+        if (!canViewConfigurationModule()) return finish()
+
         setResult(RESULT_CANCELED)
 
         val uuid = intent.uuid ?: return finish()

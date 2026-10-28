@@ -5,14 +5,10 @@ import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.view.ViewGroup
-import android.widget.TextView
-import android.graphics.Typeface
-import android.util.TypedValue
+import com.github.kr328.clash.design.util.ThemeTypography
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.getSystemService
-import androidx.core.content.res.ResourcesCompat
 import com.github.kr328.clash.common.compat.isAllowForceDarkCompat
 import com.github.kr328.clash.common.compat.isLightNavigationBarCompat
 import com.github.kr328.clash.common.compat.isLightStatusBarsCompat
@@ -51,41 +47,11 @@ abstract class BaseActivity<D : Design<*>> : AppCompatActivity(),
             field = value
             if (value != null) {
                 setContentView(value.root)
-                applySkinTypography(value.root)
+                ThemeTypography.apply(value.root)
             } else {
                 setContentView(View(this))
             }
         }
-
-    private fun applySkinTypography(view: View) {
-        val skin = uiStore.cloudThemeStyle
-        if (skin < 0) return
-        if (view is TextView) {
-            val weight = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-            val family = ResourcesCompat.getFont(this, when (skin) {
-                0 -> R.font.skin_minimal
-                1 -> R.font.skin_sakura
-                2 -> R.font.skin_god
-                else -> R.font.skin_anime
-            })
-            view.typeface = Typeface.create(family, weight)
-            view.textScaleX = when (skin) {
-                1 -> .90f
-                2 -> 1.03f
-                else -> 1f
-            }
-            view.letterSpacing = when (skin) {
-                0 -> .015f
-                1 -> .025f
-                3 -> .035f
-                else -> 0f
-            }
-            if (uiStore.cloudTextScaleEnabled) {
-                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * uiStore.cloudTextScalePercent.coerceIn(80, 140) / 100f)
-            }
-        }
-        if (view is ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
-    }
 
     private var defer: suspend () -> Unit = {}
     private var deferRunning = false

@@ -9,6 +9,7 @@ import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.design.store.UiStore
 import com.github.kr328.clash.service.ClashService
 import com.github.kr328.clash.service.TunService
+import com.github.kr328.clash.service.PreviewService
 import com.github.kr328.clash.service.util.sendBroadcastSelf
 
 fun Context.startClashService(): Intent? {
@@ -19,8 +20,10 @@ fun Context.startClashService(): Intent? {
         if (vpnRequest != null)
             return vpnRequest
 
+        stopService(PreviewService::class.intent)
         startForegroundServiceCompat(TunService::class.intent)
     } else {
+        stopService(PreviewService::class.intent)
         startForegroundServiceCompat(ClashService::class.intent)
     }
 
@@ -28,5 +31,9 @@ fun Context.startClashService(): Intent? {
 }
 
 fun Context.stopClashService() {
+    // A bound VPN survives stopService until its tunnel is released. The early
+    // service receiver cancels the core; stopService also covers a queued start.
     sendBroadcastSelf(Intent(Intents.ACTION_CLASH_REQUEST_STOP))
+    stopService(TunService::class.intent)
+    stopService(ClashService::class.intent)
 }

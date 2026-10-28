@@ -10,6 +10,7 @@ data class Proxy(
     val name: String,
     val title: String,
     val subtitle: String,
+    val server: String = "",
     val type: String,
     val delay: Int,
     var isGroup: Boolean,

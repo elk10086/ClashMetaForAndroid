@@ -350,6 +350,7 @@ class MetaFeatureSettingsDesign(
         launch(Dispatchers.Main) {
             val binding = DialogAgeKeyHelperBinding
                 .inflate(context.layoutInflater, context.root, false)
+            binding.root.applyCompactInputHints()
             val dialog = MaterialAlertDialogBuilder(context)
                 .setTitle(if (hybrid) R.string.age_key_type_hybrid else R.string.age_key_type_x25519)
                 .setView(binding.root)

@@ -4,12 +4,16 @@ import android.database.Cursor
 import android.database.MatrixCursor
 import android.os.Build
 import android.os.CancellationSignal
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract.Root
 import android.provider.DocumentsProvider
+import com.github.kr328.clash.common.CloudFeatureAccess
 import com.github.kr328.clash.common.util.PatternFileName
 import com.github.kr328.clash.service.document.*
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.io.FileNotFoundException
 import android.provider.DocumentsContract.Document as D
 
@@ -47,6 +51,7 @@ class FilesProvider : DocumentsProvider() {
         mode: String?,
         signal: CancellationSignal?
     ): ParcelFileDescriptor {
+        enforceConfigurationAccess()
         val m = ParcelFileDescriptor.parseMode(mode)
 
         return runBlocking {
@@ -58,11 +63,45 @@ class FilesProvider : DocumentsProvider() {
                 throw FileNotFoundException("invalid path $documentId")
             }
 
-            ParcelFileDescriptor.open(document.file, m)
+            if (path.scope == Path.Scope.Configuration && path.relative == null) {
+                openProtectedConfiguration(document.file, m, mode?.requestWrite ?: true)
+            } else {
+                ParcelFileDescriptor.open(document.file, m)
+            }
+        }
+    }
+
+    private fun openProtectedConfiguration(
+        stored: File,
+        mode: Int,
+        writable: Boolean,
+    ): ParcelFileDescriptor {
+        val cache = context!!.cacheDir.resolve("profile-documents").apply { mkdirs() }
+        val temporary = File.createTempFile("configuration-", ".yaml", cache)
+
+        try {
+            temporary.writeBytes(ProfileStorage.read(stored, context!!))
+            return ParcelFileDescriptor.open(
+                temporary,
+                mode,
+                Handler(Looper.getMainLooper()),
+            ) { error ->
+                try {
+                    if (writable && error == null) {
+                        ProfileStorage.write(stored, temporary.readBytes(), context!!)
+                    }
+                } finally {
+                    temporary.delete()
+                }
+            }
+        } catch (error: Throwable) {
+            temporary.delete()
+            throw error
         }
     }
 
     override fun deleteDocument(documentId: String?) {
+        enforceConfigurationAccess()
         val documentPath = documentId ?: "/"
 
         runBlocking {
@@ -82,6 +121,7 @@ class FilesProvider : DocumentsProvider() {
     }
 
     override fun renameDocument(documentId: String?, displayName: String?): String {
+        enforceConfigurationAccess()
         val name = displayName ?: ""
 
         if (!PatternFileName.matches(name))
@@ -116,6 +156,9 @@ class FilesProvider : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?
     ): Cursor {
+        if (!canAccessConfiguration()) {
+            return MatrixCursor(resolveDocumentProjection(projection))
+        }
         return runBlocking {
             try {
                 val doc = parentDocumentId ?: "/"
@@ -135,6 +178,9 @@ class FilesProvider : DocumentsProvider() {
     }
 
     override fun queryDocument(documentId: String?, projection: Array<out String>?): Cursor {
+        if (!canAccessConfiguration()) {
+            return MatrixCursor(resolveDocumentProjection(projection))
+        }
         return runBlocking {
             try {
                 val doc = documentId ?: "/"
@@ -155,6 +201,9 @@ class FilesProvider : DocumentsProvider() {
     }
 
     override fun queryRoots(projection: Array<out String>?): Cursor {
+        if (!canAccessConfiguration()) {
+            return MatrixCursor(projection ?: DEFAULT_ROOT_COLUMNS)
+        }
         val flags = Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD
 
         return MatrixCursor(projection ?: DEFAULT_ROOT_COLUMNS).apply {
@@ -171,6 +220,7 @@ class FilesProvider : DocumentsProvider() {
     }
 
     override fun isChildDocument(parentDocumentId: String?, documentId: String?): Boolean {
+        if (!canAccessConfiguration()) return false
         if (parentDocumentId == null || documentId == null)
             return false
 
@@ -199,6 +249,16 @@ class FilesProvider : DocumentsProvider() {
 
     private fun resolveDocumentProjection(projection: Array<out String>?): Array<out String> {
         return projection ?: DEFAULT_DOCUMENT_COLUMNS
+    }
+
+    private fun canAccessConfiguration(): Boolean {
+        return CloudFeatureAccess.canViewConfiguration(context!!, BuildConfig.DEBUG)
+    }
+
+    private fun enforceConfigurationAccess() {
+        if (!canAccessConfiguration()) {
+            throw FileNotFoundException("configuration module is unavailable")
+        }
     }
 
     private val String.requestWrite: Boolean

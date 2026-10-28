@@ -7,6 +7,7 @@ import com.github.kr328.clash.design.R
 import com.github.kr328.clash.design.adapter.EditableTextMapAdapter
 import com.github.kr328.clash.design.databinding.DialogEditableMapTextFieldBinding
 import com.github.kr328.clash.design.util.layoutInflater
+import com.github.kr328.clash.design.util.applyCompactInputHints
 import com.github.kr328.clash.design.util.root
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.*
@@ -123,6 +124,7 @@ private suspend fun requestModelInputEntry(
     return suspendCancellableCoroutine { ctx ->
         val binding = DialogEditableMapTextFieldBinding
             .inflate(context.layoutInflater, context.root, false)
+        binding.root.applyCompactInputHints()
 
         val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(title)

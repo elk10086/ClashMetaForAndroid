@@ -31,6 +31,7 @@ func logDns(cfg *config.RawConfig) {
 
 func UnmarshalAndPatch(profilePath string) (*config.RawConfig, error) {
 	configPath := P.Join(profilePath, "config.yaml")
+	previous, ddnsChanged, _ := applyDdnsToProfile(profilePath, configPath, false)
 
 	configData, err := os.ReadFile(configPath)
 	if err != nil {
@@ -38,6 +39,13 @@ func UnmarshalAndPatch(profilePath string) (*config.RawConfig, error) {
 	}
 
 	rawConfig, err := config.UnmarshalRawConfig(configData)
+	if err != nil && ddnsChanged {
+		_ = os.WriteFile(configPath, previous, 0600)
+		configData, err = os.ReadFile(configPath)
+		if err == nil {
+			rawConfig, err = config.UnmarshalRawConfig(configData)
+		}
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +77,20 @@ func Load(path string) error {
 	logDns(rawCfg)
 
 	cfg, err := Parse(rawCfg)
+	if err != nil && restoreDdnsOriginal(P.Join(path, "config.yaml")) {
+		configData, readErr := os.ReadFile(P.Join(path, "config.yaml"))
+		if readErr != nil {
+			err = readErr
+		} else {
+			rawCfg, err = config.UnmarshalRawConfig(configData)
+		}
+		if err == nil {
+			err = process(rawCfg, path)
+		}
+		if err == nil {
+			cfg, err = Parse(rawCfg)
+		}
+	}
 	if err != nil {
 		log.Errorln("Load %s: %s", path, err.Error())
 

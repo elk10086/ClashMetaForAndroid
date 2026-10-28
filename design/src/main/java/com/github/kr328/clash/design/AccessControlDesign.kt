@@ -7,6 +7,7 @@ import com.github.kr328.clash.design.adapter.AppAdapter
 import com.github.kr328.clash.design.component.AccessControlMenu
 import com.github.kr328.clash.design.databinding.DesignAccessControlBinding
 import com.github.kr328.clash.design.databinding.DialogSearchBinding
+import com.github.kr328.clash.design.util.applyCompactInputHints
 import com.github.kr328.clash.design.dialog.FullScreenDialog
 import com.github.kr328.clash.design.model.AppInfo
 import com.github.kr328.clash.design.store.UiStore
@@ -84,6 +85,7 @@ class AccessControlDesign(
         coroutineScope {
             val binding = DialogSearchBinding
                 .inflate(context.layoutInflater, context.root, false)
+            binding.root.applyCompactInputHints()
             val adapter = AppAdapter(context, selected)
             val dialog = FullScreenDialog(context)
             val filter = Channel<Unit>(Channel.CONFLATED)

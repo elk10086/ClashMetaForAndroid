@@ -2,18 +2,23 @@ package com.github.kr328.clash
 
 import android.graphics.Color
 import android.graphics.Typeface
+import com.github.kr328.clash.design.util.ThemeTypography
+import com.github.kr328.clash.design.util.ClientVersion
+import com.github.kr328.clash.design.util.showThemed
 import android.graphics.drawable.GradientDrawable
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.text.InputType
-import android.util.TypedValue
 import android.text.Editable
 import android.text.TextWatcher
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import com.github.kr328.clash.design.util.compactInputHint
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -22,7 +27,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.core.content.res.ResourcesCompat
 import com.github.kr328.clash.cloud.CloudApi
 import com.github.kr328.clash.cloud.CloudSession
 import com.github.kr328.clash.cloud.CloudTestAccount
@@ -84,24 +88,7 @@ class CloudAuthActivity : AppCompatActivity() {
     private fun render() {
         val page = if (step == Step.LOGIN) loginPage() else flowPage()
         setContentView(page)
-        applySkinTypography(page)
-    }
-
-    private fun applySkinTypography(view: View) {
-        val skin = UiStore(this).cloudThemeStyle
-        if (skin < 0) return
-        if (view is TextView) {
-            val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-            view.typeface = themeTypeface(style)
-            view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
-            view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
-            val store = UiStore(this)
-            if (store.cloudTextScaleEnabled) {
-                view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
-            }
-            if (!view.hint.isNullOrBlank()) view.setHintTextColor(secondary())
-        }
-        if (view is android.view.ViewGroup) repeat(view.childCount) { applySkinTypography(view.getChildAt(it)) }
+        ThemeTypography.apply(page)
     }
 
     private fun loginPage(): View {
@@ -118,11 +105,17 @@ class CloudAuthActivity : AppCompatActivity() {
             } else false
         }
         val password = input(getString(DesignR.string.cloud_auth_password), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        password.transformationMethod = PasswordTransformationMethod.getInstance()
         password.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.cloud_eye_closed, 0)
         password.setOnTouchListener { _, event ->
             if (event.action == android.view.MotionEvent.ACTION_UP && event.x >= password.width - password.compoundPaddingEnd) {
-                val hidden = password.inputType and InputType.TYPE_TEXT_VARIATION_PASSWORD != 0
+                val hidden = password.transformationMethod is PasswordTransformationMethod
                 password.inputType = InputType.TYPE_CLASS_TEXT or if (hidden) InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD else InputType.TYPE_TEXT_VARIATION_PASSWORD
+                password.transformationMethod = if (hidden) {
+                    HideReturnsTransformationMethod.getInstance()
+                } else {
+                    PasswordTransformationMethod.getInstance()
+                }
                 password.setCompoundDrawablesWithIntrinsicBounds(0, 0, if (hidden) R.drawable.cloud_eye_opened else R.drawable.cloud_eye_closed, 0)
                 password.setSelection(password.length())
                 true
@@ -229,7 +222,9 @@ class CloudAuthActivity : AppCompatActivity() {
 
     private fun passwordStep(content: LinearLayout) {
         content.heading(getString(DesignR.string.cloud_create_password), getString(DesignR.string.cloud_password_subtitle))
-        val field = flowInput(getString(DesignR.string.cloud_auth_password), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val field = flowInput(getString(DesignR.string.cloud_auth_password), InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD).apply {
+            transformationMethod = PasswordTransformationMethod.getInstance()
+        }
         content.addView(field); content.addSpace(20)
         content.addView(primaryButton(if (resetting) getString(DesignR.string.cloud_auth_reset_submit) else getString(DesignR.string.cloud_auth_register)) {
             runBusy {
@@ -278,17 +273,28 @@ class CloudAuthActivity : AppCompatActivity() {
                 marginEnd = dp(16); bottomMargin = dp(16)
             })
         }, LinearLayout.LayoutParams(-1, 0, 1f))
-        if (footer) addView(TextView(this@CloudAuthActivity).apply { text = getString(DesignR.string.cloud_current_version, packageManager.getPackageInfo(packageName, 0).versionName); gravity = Gravity.CENTER; textSize = 12f; setTextColor(secondary()) }, lp(-1, dp(32)))
+        if (footer) addView(TextView(this@CloudAuthActivity).apply {
+            text = getString(DesignR.string.cloud_current_version, ClientVersion.display(packageManager.getPackageInfo(packageName, 0).versionName))
+            gravity = Gravity.CENTER
+            textSize = 12f
+            setTextColor(secondary())
+        }, lp(-1, dp(32)))
     }
 
     private fun input(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
-        this.hint = hint; inputType = type; textSize = 16f; setTextColor(foreground()); setHintTextColor(secondary())
-        isSingleLine = true; typeface = themeTypeface(Typeface.NORMAL)
+        this.hint = hint.compactInputHint(this@CloudAuthActivity); isSingleLine = true; inputType = type; textSize = 16f; setTextColor(foreground()); setHintTextColor(secondary())
+        typeface = themeTypeface(Typeface.NORMAL)
+        if (type and InputType.TYPE_TEXT_VARIATION_PASSWORD != 0) {
+            transformationMethod = PasswordTransformationMethod.getInstance()
+        }
         background = rounded(surface(), 16, outline()); setPadding(dp(20), 0, dp(16), 0); layoutParams = lp(-1, dp(58))
     }
 
     private fun flowInput(hint: String, type: Int = InputType.TYPE_CLASS_TEXT) = EditText(this).apply {
-        this.hint = hint; inputType = type; textSize = 14f; setTextColor(foreground()); setHintTextColor(secondary())
+        this.hint = hint.compactInputHint(this@CloudAuthActivity); inputType = type; textSize = 14f; setTextColor(foreground()); setHintTextColor(secondary())
+        if (type and InputType.TYPE_TEXT_VARIATION_PASSWORD != 0) {
+            transformationMethod = PasswordTransformationMethod.getInstance()
+        }
         background = rounded(surface(), 10, outline()); setPadding(dp(15), 0, dp(15), 0); layoutParams = lp(-1, dp(55))
     }
 
@@ -322,7 +328,19 @@ class CloudAuthActivity : AppCompatActivity() {
             }
         }
     }
-    private fun runBusy(block: suspend () -> Unit) { if (busy) return; busy = true; lifecycleScope.launch { try { block() } catch (e: Throwable) { toast(e.message ?: getString(DesignR.string.cloud_operation_failed)) } finally { busy = false } } }
+    private fun runBusy(block: suspend () -> Unit) {
+        if (busy) return
+        busy = true
+        lifecycleScope.launch {
+            try {
+                withCloudRequestLoading("正在连接服务…") { block() }
+            } catch (e: Throwable) {
+                toast(e.message ?: getString(DesignR.string.cloud_operation_failed))
+            } finally {
+                busy = false
+            }
+        }
+    }
     private fun validEmail(value: String) = android.util.Patterns.EMAIL_ADDRESS.matcher(value).matches()
     private fun showTestAccounts(emailField: EditText) {
         val accounts = CloudTestAccount.emails.toTypedArray()
@@ -334,15 +352,18 @@ class CloudAuthActivity : AppCompatActivity() {
                 toast(getString(DesignR.string.cloud_test_account_selected))
             }
             .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .showThemed()
     }
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun backgroundColor() = resolveThemedColor(android.R.attr.windowBackground)
     private fun surface() = resolveThemedColor(com.google.android.material.R.attr.colorSurface)
     private fun foreground() = resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
-    private fun secondary() = blend(foreground(), backgroundColor(), .38f)
-    private fun outline() = blend(foreground(), backgroundColor(), .72f)
+    private fun secondary() = if (UiStore(this).cloudThemeStyle == 1) {
+        resolveThemedColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
+    } else blend(foreground(), backgroundColor(), .38f)
+    private fun outline() =
+        resolveThemedColor(com.google.android.material.R.attr.colorOutline)
     private fun accent() = resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
     private fun onAccent() = resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
     private fun isDark(): Boolean = when (UiStore(this).darkMode) {
@@ -362,14 +383,7 @@ class CloudAuthActivity : AppCompatActivity() {
         if (isDark() && store.pureBlack) theme.applyStyle(DesignR.style.CloudThemePureBlack, true)
     }
     private fun themeTypeface(style: Int): Typeface {
-        val font = when (UiStore(this).cloudThemeStyle) {
-            0 -> DesignR.font.skin_minimal
-            1 -> DesignR.font.skin_sakura
-            2 -> DesignR.font.skin_god
-            3 -> DesignR.font.skin_anime
-            else -> return Typeface.create("sans-serif", style)
-        }
-        return Typeface.create(ResourcesCompat.getFont(this, font), style)
+        return ThemeTypography.typeface(this, emphasis = style == Typeface.BOLD)
     }
     private fun blend(a: Int, b: Int, ratio: Float) = Color.rgb((Color.red(a) * (1 - ratio) + Color.red(b) * ratio).toInt(), (Color.green(a) * (1 - ratio) + Color.green(b) * ratio).toInt(), (Color.blue(a) * (1 - ratio) + Color.blue(b) * ratio).toInt())
 }

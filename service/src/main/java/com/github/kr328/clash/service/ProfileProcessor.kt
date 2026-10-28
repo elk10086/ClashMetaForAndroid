@@ -31,60 +31,70 @@ object ProfileProcessor {
     suspend fun apply(context: Context, uuid: UUID, callback: IFetchObserver? = null) {
         withContext(NonCancellable) {
             processLock.withLock {
-                val snapshot = profileLock.withLock {
-                    val pending =
-                        PendingDao().queryByUUID(uuid) ?: throw IllegalArgumentException("profile $uuid not found")
+                try {
+                    val snapshot = profileLock.withLock {
+                        val pending = PendingDao().queryByUUID(uuid)
+                            ?: throw IllegalArgumentException("profile $uuid not found")
 
-                    pending.enforceFieldValid()
+                        pending.enforceFieldValid()
 
-                    context.processingDir.deleteRecursively()
-                    context.processingDir.mkdirs()
+                        context.processingDir.deleteRecursively()
+                        context.processingDir.mkdirs()
 
-                    context.pendingDir.resolve(pending.uuid.toString())
-                        .copyRecursively(context.processingDir, overwrite = true)
-
-                    pending
-                }
-
-                Clash.setAgeSecretKey(snapshot.ageSecretKey?.takeIf { it.isNotBlank() })
-
-                val force = snapshot.type != Profile.Type.File
-                val subscriptionInfo = fetchProfile(context, snapshot.source, force, callback)
-
-                profileLock.withLock {
-                    if (PendingDao().queryByUUID(snapshot.uuid) == snapshot) {
-                        context.importedDir.resolve(snapshot.uuid.toString()).deleteRecursively()
-                        context.processingDir.copyRecursively(context.importedDir.resolve(snapshot.uuid.toString()))
-
-                        val old = ImportedDao().queryByUUID(snapshot.uuid)
-                        val updateInterval = subscriptionInfo?.subUpdateInterval
-                            ?.takeIf { old == null && snapshot.interval == 0L }
-                            ?: snapshot.interval
-                        val new = Imported(
-                            snapshot.uuid,
-                            snapshot.name,
-                            snapshot.type,
-                            snapshot.source,
-                            updateInterval,
-                            subscriptionInfo?.subUpload ?: 0,
-                            subscriptionInfo?.subDownload ?: 0,
-                            subscriptionInfo?.subTotal ?: 0,
-                            subscriptionInfo?.subExpire ?: 0,
-                            old?.createdAt ?: System.currentTimeMillis(),
-                            ageSecretKey = snapshot.ageSecretKey
-                        )
-                        if (old != null) {
-                            ImportedDao().update(new)
+                        context.pendingDir.resolve(pending.uuid.toString())
+                            .copyRecursively(context.processingDir, overwrite = true)
+                        if (pending.type == Profile.Type.Url) {
+                            ProfileStorage.decryptProfileFilesForDownload(context.processingDir, context)
                         } else {
-                            ImportedDao().insert(new)
+                            ProfileStorage.decryptProfileFiles(context.processingDir, context)
                         }
 
-                        PendingDao().remove(snapshot.uuid)
-
-                        context.pendingDir.resolve(snapshot.uuid.toString()).deleteRecursively()
-
-                        context.sendProfileChanged(snapshot.uuid)
+                        pending
                     }
+
+                    Clash.setAgeSecretKey(snapshot.ageSecretKey?.takeIf { it.isNotBlank() })
+
+                    val force = snapshot.type != Profile.Type.File
+                    val subscriptionInfo = fetchProfile(context, snapshot.source, force, callback)
+                    ProfileStorage.encryptProfileFiles(context.processingDir, context)
+
+                    profileLock.withLock {
+                        if (PendingDao().queryByUUID(snapshot.uuid) == snapshot) {
+                            context.importedDir.resolve(snapshot.uuid.toString()).deleteRecursively()
+                            context.processingDir.copyRecursively(context.importedDir.resolve(snapshot.uuid.toString()))
+
+                            val old = ImportedDao().queryByUUID(snapshot.uuid)
+                            val updateInterval = subscriptionInfo?.subUpdateInterval
+                                ?.takeIf { old == null && snapshot.interval == 0L }
+                                ?: snapshot.interval
+                            val new = Imported(
+                                snapshot.uuid,
+                                snapshot.name,
+                                snapshot.type,
+                                snapshot.source,
+                                updateInterval,
+                                subscriptionInfo?.subUpload ?: 0,
+                                subscriptionInfo?.subDownload ?: 0,
+                                subscriptionInfo?.subTotal ?: 0,
+                                subscriptionInfo?.subExpire ?: 0,
+                                old?.createdAt ?: System.currentTimeMillis(),
+                                ageSecretKey = snapshot.ageSecretKey,
+                            )
+                            if (old != null) {
+                                ImportedDao().update(new)
+                            } else {
+                                ImportedDao().insert(new)
+                            }
+
+                            PendingDao().remove(snapshot.uuid)
+
+                            context.pendingDir.resolve(snapshot.uuid.toString()).deleteRecursively()
+
+                            context.sendProfileChanged(snapshot.uuid)
+                        }
+                    }
+                } finally {
+                    context.processingDir.deleteRecursively()
                 }
             }
         }
@@ -93,43 +103,53 @@ object ProfileProcessor {
     suspend fun update(context: Context, uuid: UUID, callback: IFetchObserver?) {
         withContext(NonCancellable) {
             processLock.withLock {
-                val snapshot = profileLock.withLock {
-                    val imported =
-                        ImportedDao().queryByUUID(uuid) ?: throw IllegalArgumentException("profile $uuid not found")
+                try {
+                    val snapshot = profileLock.withLock {
+                        val imported = ImportedDao().queryByUUID(uuid)
+                            ?: throw IllegalArgumentException("profile $uuid not found")
 
-                    context.processingDir.deleteRecursively()
-                    context.processingDir.mkdirs()
+                        context.processingDir.deleteRecursively()
+                        context.processingDir.mkdirs()
 
-                    context.importedDir.resolve(imported.uuid.toString())
-                        .copyRecursively(context.processingDir, overwrite = true)
-
-                    imported
-                }
-
-                Clash.setAgeSecretKey(snapshot.ageSecretKey?.takeIf { it.isNotBlank() })
-
-                val subscriptionInfo = fetchProfile(context, snapshot.source, true, callback)
-
-                profileLock.withLock {
-                    val imported = ImportedDao().queryByUUID(snapshot.uuid)
-                    if (imported != null) {
-                        context.importedDir.resolve(snapshot.uuid.toString()).deleteRecursively()
-                        context.processingDir.copyRecursively(context.importedDir.resolve(snapshot.uuid.toString()))
-
-                        val upload = subscriptionInfo?.subUpload
-                        if (upload != null) {
-                            ImportedDao().update(
-                                imported.copy(
-                                    upload = upload,
-                                    download = subscriptionInfo.subDownload ?: 0,
-                                    total = subscriptionInfo.subTotal ?: 0,
-                                    expire = subscriptionInfo.subExpire ?: 0,
-                                )
-                            )
+                        context.importedDir.resolve(imported.uuid.toString())
+                            .copyRecursively(context.processingDir, overwrite = true)
+                        if (imported.type == Profile.Type.Url) {
+                            ProfileStorage.decryptProfileFilesForDownload(context.processingDir, context)
+                        } else {
+                            ProfileStorage.decryptProfileFiles(context.processingDir, context)
                         }
 
-                        context.sendProfileChanged(snapshot.uuid)
+                        imported
                     }
+
+                    Clash.setAgeSecretKey(snapshot.ageSecretKey?.takeIf { it.isNotBlank() })
+
+                    val subscriptionInfo = fetchProfile(context, snapshot.source, true, callback)
+                    ProfileStorage.encryptProfileFiles(context.processingDir, context)
+
+                    profileLock.withLock {
+                        val imported = ImportedDao().queryByUUID(snapshot.uuid)
+                        if (imported != null) {
+                            context.importedDir.resolve(snapshot.uuid.toString()).deleteRecursively()
+                            context.processingDir.copyRecursively(context.importedDir.resolve(snapshot.uuid.toString()))
+
+                            val upload = subscriptionInfo?.subUpload
+                            if (upload != null) {
+                                ImportedDao().update(
+                                    imported.copy(
+                                        upload = upload,
+                                        download = subscriptionInfo.subDownload ?: 0,
+                                        total = subscriptionInfo.subTotal ?: 0,
+                                        expire = subscriptionInfo.subExpire ?: 0,
+                                    )
+                                )
+                            }
+
+                            context.sendProfileChanged(snapshot.uuid)
+                        }
+                    }
+                } finally {
+                    context.processingDir.deleteRecursively()
                 }
             }
         }

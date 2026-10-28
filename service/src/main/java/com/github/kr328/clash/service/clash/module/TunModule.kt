@@ -6,13 +6,11 @@ import android.os.Build
 import androidx.core.content.getSystemService
 import com.github.kr328.clash.core.Clash
 import com.github.kr328.clash.core.util.parseInetSocketAddress
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.withContext
 import java.net.InetSocketAddress
 import java.security.SecureRandom
 
-class TunModule(private val vpn: VpnService) : Module<Unit>(vpn) {
+/** Owned by the runtime's try/finally, not by an asynchronously scheduled module. */
+class TunModule(private val vpn: VpnService) {
     data class TunDevice(
         val fd: Int,
         var stack: String,
@@ -21,8 +19,7 @@ class TunModule(private val vpn: VpnService) : Module<Unit>(vpn) {
         val dns: String,
     )
 
-    private val connectivity = service.getSystemService<ConnectivityManager>()!!
-    private val close = Channel<Unit>(Channel.CONFLATED)
+    private val connectivity = vpn.getSystemService<ConnectivityManager>()!!
 
     private fun queryUid(
         protocol: Int,
@@ -34,16 +31,6 @@ class TunModule(private val vpn: VpnService) : Module<Unit>(vpn) {
 
         return runCatching { connectivity.getConnectionOwnerUid(protocol, source, target) }
             .getOrElse { -1 }
-    }
-
-    override suspend fun run() {
-        try {
-            return close.receive()
-        } finally {
-            withContext(NonCancellable) {
-                requestStop()
-            }
-        }
     }
 
     fun listenHttp(): InetSocketAddress? {
@@ -66,16 +53,17 @@ class TunModule(private val vpn: VpnService) : Module<Unit>(vpn) {
         )
     }
 
-    suspend fun close() {
-        close.send(Unit)
+    fun close() {
+        requestStop()
     }
 
     companion object {
         private val random = SecureRandom()
 
         fun requestStop() {
-            Clash.stopHttp()
+            // Release the VPN first; do not leave Android bound while HTTP drains.
             Clash.stopTun()
+            Clash.stopHttp()
         }
     }
 }

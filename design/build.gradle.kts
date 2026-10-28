@@ -18,4 +18,5 @@ dependencies {
     implementation(libs.androidx.fragment)
     implementation(libs.androidx.viewpager)
     implementation(libs.google.material)
+    testImplementation("junit:junit:4.13.2")
 }

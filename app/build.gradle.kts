@@ -27,6 +27,8 @@ dependencies {
     implementation(libs.google.material)
     implementation(libs.quickie.bundled)
     implementation(libs.androidx.activity.ktx)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20180813")
 }
 
 tasks.getByName("clean", type = Delete::class) {

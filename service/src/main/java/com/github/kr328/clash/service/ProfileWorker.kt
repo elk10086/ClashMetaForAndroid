@@ -81,17 +81,30 @@ class ProfileWorker : BaseService() {
 
     private suspend fun run(uuid: UUID) {
         val imported = ImportedDao().queryByUUID(uuid) ?: return
+        val silent = imported.name == "云端订阅"
 
         try {
-            processing(imported.name) {
+            if (silent) {
                 ProfileProcessor.update(this, imported.uuid, null)
+            } else {
+                processing(imported.name) {
+                    ProfileProcessor.update(this, imported.uuid, null)
+                }
             }
 
-            completed(imported.uuid, imported.name)
+            if (silent) {
+                sendProfileUpdateCompleted(imported.uuid)
+            } else {
+                completed(imported.uuid, imported.name)
+            }
 
             ProfileReceiver.scheduleNext(this, imported)
         } catch (e: Exception) {
-            failed(imported.uuid, imported.name, e.message ?: "Unknown")
+            if (silent) {
+                failedCloudSubscription(imported.uuid)
+            } else {
+                failed(imported.uuid, imported.name, e.message ?: "Unknown")
+            }
         }
     }
 
@@ -198,6 +211,19 @@ class ProfileWorker : BaseService() {
             .notify(id, notification)
 
         sendProfileUpdateFailed(uuid, reason)
+    }
+
+    private fun failedCloudSubscription(uuid: UUID) {
+        val id = UndefinedIds.next()
+        val content = getString(R.string.cloud_subscription_update_failure)
+        val notification = resultBuilder(id, uuid)
+            .setContentTitle(getString(R.string.update_failure))
+            .setContentText(content)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(content))
+            .build()
+
+        NotificationManagerCompat.from(this).notify(id, notification)
+        sendProfileUpdateFailed(uuid, content)
     }
 
     companion object {

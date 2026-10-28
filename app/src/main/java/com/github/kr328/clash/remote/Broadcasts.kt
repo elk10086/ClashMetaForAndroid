@@ -98,6 +98,7 @@ class Broadcasts(private val context: Application) {
                 addAction(Intents.ACTION_PROFILE_UPDATE_FAILED)
                 addAction(Intents.ACTION_PROFILE_LOADED)
             })
+            registered = true
 
             clashRunning = StatusClient(context).currentProfile() != null
         } catch (e: Exception) {
@@ -115,6 +116,8 @@ class Broadcasts(private val context: Application) {
             clashRunning = false
         } catch (e: Exception) {
             Log.w("Unregister global receiver: $e", e)
+        } finally {
+            registered = false
         }
     }
 }

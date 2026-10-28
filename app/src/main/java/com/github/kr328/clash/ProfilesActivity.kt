@@ -22,6 +22,8 @@ import com.github.kr328.clash.design.R
 
 class ProfilesActivity : BaseActivity<ProfilesDesign>() {
     override suspend fun main() {
+        if (!canViewConfigurationModule()) return finish()
+
         val design = ProfilesDesign(this)
 
         setContentDesign(design)

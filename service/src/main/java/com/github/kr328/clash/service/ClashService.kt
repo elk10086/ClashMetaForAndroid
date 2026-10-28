@@ -4,27 +4,34 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import com.github.kr328.clash.common.log.Log
+import com.github.kr328.clash.common.util.intent
 import com.github.kr328.clash.service.clash.clashRuntime
 import com.github.kr328.clash.service.clash.module.*
 import com.github.kr328.clash.service.store.ServiceStore
-import com.github.kr328.clash.service.util.cancelAndJoinBlocking
 import com.github.kr328.clash.service.util.sendClashStarted
 import com.github.kr328.clash.service.util.sendClashStopped
+import com.github.kr328.clash.service.util.ServiceStopReceiver
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 
-class ClashService : BaseService() {
+class ClashService : RuntimeService() {
     private val self: ClashService
         get() = this
 
     private var reason: String? = null
+    private var ownsRuntime = false
+    private val stopReceiver = ServiceStopReceiver(this) {
+        cancel()
+        stopSelf()
+    }
 
     private val runtime = clashRuntime {
         val store = ServiceStore(self)
 
-        val close = install(CloseModule(self))
         val config = install(ConfigurationModule(self))
         val network = install(NetworkObserveModule(self))
 
@@ -40,9 +47,6 @@ class ClashService : BaseService() {
         try {
             while (isActive) {
                 val quit = select<Boolean> {
-                    close.onEvent {
-                        true
-                    }
                     config.onEvent {
                         reason = it.message
 
@@ -55,13 +59,15 @@ class ClashService : BaseService() {
 
                 if (quit) break
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("Create clash runtime: ${e.message}", e)
 
             reason = e.message
         } finally {
             withContext(NonCancellable) {
-                stopSelf()
+                if (this@ClashService.isActive) stopSelf()
             }
         }
     }
@@ -69,19 +75,23 @@ class ClashService : BaseService() {
     override fun onCreate() {
         super.onCreate()
 
+        StaticNotificationModule.createNotificationChannel(this)
+        StaticNotificationModule.notifyLoadingNotification(this)
+
         if (StatusProvider.serviceRunning)
             return stopSelf()
 
+        ownsRuntime = true
         StatusProvider.serviceRunning = true
-
-        StaticNotificationModule.createNotificationChannel(this)
-        StaticNotificationModule.notifyLoadingNotification(this)
+        stopReceiver.register()
+        stopService(PreviewService::class.intent)
 
         runtime.launch()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        sendClashStarted()
+        StaticNotificationModule.notifyLoadingNotification(this)
+        if (ownsRuntime && isActive) sendClashStarted() else stopSelf(startId)
 
         return START_STICKY
     }
@@ -91,11 +101,11 @@ class ClashService : BaseService() {
     }
 
     override fun onDestroy() {
-        StatusProvider.serviceRunning = false
-
-        sendClashStopped(reason)
-
-        cancelAndJoinBlocking()
+        stopReceiver.unregister()
+        if (ownsRuntime) {
+            StatusProvider.serviceRunning = false
+            sendClashStopped(reason)
+        }
 
         Log.i("ClashService destroyed: ${reason ?: "successfully"}")
 

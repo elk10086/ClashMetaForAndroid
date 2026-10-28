@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import com.github.kr328.clash.ApkBrokenActivity
 import com.github.kr328.clash.AppCrashedActivity
+import com.github.kr328.clash.cloud.CloudMembershipRefresh
 import com.github.kr328.clash.common.Global
 import com.github.kr328.clash.common.log.Log
 import com.github.kr328.clash.common.util.intent
@@ -31,6 +32,7 @@ object Remote {
         ApplicationObserver.attach(Global.application)
 
         ApplicationObserver.onVisibleChanged {
+            CloudMembershipRefresh.setVisible(Global.application, it)
             if(it) {
                 Log.d("App becomes visible")
                 service.bind()

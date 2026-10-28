@@ -1,12 +1,18 @@
 package com.github.kr328.clash
 
+import com.github.kr328.clash.design.util.ClientVersion
+
 import android.content.Intent
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.Typeface
+import com.github.kr328.clash.design.util.ThemeTypography
+import com.github.kr328.clash.design.util.showThemed
+import com.github.kr328.clash.design.util.SakuraCards
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
@@ -17,6 +23,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.util.TypedValue
 import android.widget.EditText
+import com.github.kr328.clash.design.util.compactInputHint
 import android.widget.LinearLayout
 import android.widget.ImageView
 import android.widget.GridLayout
@@ -35,11 +42,16 @@ import android.webkit.WebChromeClient
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.core.content.res.ResourcesCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.github.kr328.clash.cloud.CloudApi
+import com.github.kr328.clash.cloud.CloudInviteSummary
 import com.github.kr328.clash.cloud.CloudSession
+import com.github.kr328.clash.cloud.deleteCloudProfiles
+import com.github.kr328.clash.cloud.withCloudProfileSync
 import com.github.kr328.clash.cloud.CloudSubscription
+import com.github.kr328.clash.cloud.CloudSubscriptionCache
 import com.github.kr328.clash.cloud.CloudReleaseManager
 import com.github.kr328.clash.design.model.DarkMode
 import com.github.kr328.clash.design.store.UiStore
@@ -84,11 +96,12 @@ private fun Context.cloudColor(value: String): Int {
         val onSurface = resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
         return when (value.uppercase()) {
             "#FAFAFA" -> if (dark && uiStore.pureBlack) Color.BLACK else page
-            "#FFFFFF", "#F5F5F5" -> surface
+            "#FFFFFF" -> surface
+            "#F5F5F5" -> if (uiStore.cloudThemeStyle == 1) resolveThemedColor(com.google.android.material.R.attr.colorSurfaceVariant) else surface
             "#212121", "#000000", "#424242" -> onSurface
-            "#616161", "#757575", "#9E9E9E" -> blendCloudColor(onSurface, surface, .38f)
+            "#616161", "#757575", "#9E9E9E" -> if (uiStore.cloudThemeStyle == 1) resolveThemedColor(com.google.android.material.R.attr.colorOnSurfaceVariant) else blendCloudColor(onSurface, surface, .38f)
             "#EEEEEE", "#E8E8E8" -> blendCloudColor(surface, onSurface, .09f)
-            "#E0E0E0", "#BDBDBD" -> blendCloudColor(surface, onSurface, .10f)
+            "#E0E0E0", "#BDBDBD" -> if (uiStore.cloudThemeStyle == 1) cloudOutlineColor() else blendCloudColor(surface, onSurface, .10f)
             else -> Color.parseColor(value)
         }
     }
@@ -112,7 +125,7 @@ private fun blendCloudColor(a: Int, b: Int, ratio: Float): Int = Color.rgb(
 
 private fun Context.cloudPrimaryColor(): Int = when (UiStore(this).cloudThemeStyle) {
     0 -> Color.parseColor(if (isCloudDark()) "#FFFFFF" else "#212121")
-    1 -> Color.parseColor("#FFB3C9")
+    1 -> resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
     2 -> Color.parseColor("#45B6E5")
     3 -> Color.parseColor("#C9A227")
     else -> resolveThemedColor(com.google.android.material.R.attr.colorPrimary)
@@ -122,7 +135,9 @@ private fun Context.cloudSecondaryColor(): Int = resolveThemedColor(com.google.a
 
 private fun Context.cloudOutlineColor(): Int = resolveThemedColor(com.google.android.material.R.attr.colorOutline)
 
-private fun Context.cloudHintColor(): Int = blendCloudColor(
+private fun Context.cloudHintColor(): Int = if (UiStore(this).cloudThemeStyle == 1) {
+    resolveThemedColor(android.R.attr.textColorHint)
+} else blendCloudColor(
     resolveThemedColor(com.google.android.material.R.attr.colorOnSurface),
     resolveThemedColor(com.google.android.material.R.attr.colorSurface),
     .52f,
@@ -136,7 +151,9 @@ private fun Context.cloudPriceChipColor(): Int = blendCloudColor(
     .12f,
 )
 
-private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).cloudThemeStyle == 0 && !isCloudDark()) {
+private fun Context.cloudButtonTextColor(): Int = if (UiStore(this).cloudThemeStyle == 1) {
+    resolveThemedColor(com.google.android.material.R.attr.colorOnPrimary)
+} else if (UiStore(this).cloudThemeStyle == 0 && !isCloudDark()) {
     Color.WHITE
 } else {
     Color.parseColor("#121212")
@@ -150,10 +167,12 @@ private fun Context.isCloudDark(): Boolean = when (UiStore(this).darkMode) {
 
 /** Mirrors CommonCard's selected secondaryContainer/onSecondaryContainer colors in free_time_new. */
 private fun Context.cloudSelectedContainerColor(): Int {
+    if (UiStore(this).cloudThemeStyle == 1) {
+        return resolveThemedColor(com.google.android.material.R.attr.colorSecondaryContainer)
+    }
     val dark = isCloudDark()
     val container = when (UiStore(this).cloudThemeStyle) {
         0 -> Color.parseColor(if (dark) "#242424" else "#E0E0E0")
-        1 -> Color.parseColor(if (dark) "#32232D" else "#FFEDF4")
         2 -> Color.parseColor(if (dark) "#122530" else "#D8F2FA")
         3 -> Color.parseColor(if (dark) "#1C1C1C" else "#E9DFC7")
         else -> blendCloudColor(
@@ -170,7 +189,7 @@ private fun Context.cloudSelectedTextColor(): Int {
     val dark = isCloudDark()
     return when (UiStore(this).cloudThemeStyle) {
         0 -> Color.parseColor(if (dark) "#E8E8E8" else "#212121")
-        1 -> Color.parseColor(if (dark) "#F5DDE8" else "#4A1730")
+        1 -> resolveThemedColor(com.google.android.material.R.attr.colorOnSecondaryContainer)
         2 -> Color.parseColor(if (dark) "#DDF4FA" else "#052A3A")
         3 -> Color.parseColor(if (dark) "#ECE8E0" else "#1A1816")
         else -> resolveThemedColor(com.google.android.material.R.attr.colorOnSurface)
@@ -178,27 +197,7 @@ private fun Context.cloudSelectedTextColor(): Int {
 }
 
 internal fun Context.applyCloudTypography(view: View) {
-    if (view.tag == "cloud_bottom_navigation_typography") return
-    val skin = UiStore(this).cloudThemeStyle
-    if (skin < 0) return
-    if (view is TextView) {
-        val style = if (view.typeface?.isBold == true) Typeface.BOLD else Typeface.NORMAL
-        val family = ResourcesCompat.getFont(this, when (skin) {
-            0 -> DesignR.font.skin_minimal
-            1 -> DesignR.font.skin_sakura
-            2 -> DesignR.font.skin_god
-            else -> DesignR.font.skin_anime
-        })
-        view.typeface = Typeface.create(family, style)
-        view.textScaleX = when (skin) { 1 -> .90f; 2 -> 1.03f; else -> 1f }
-        view.letterSpacing = when (skin) { 0 -> .015f; 1 -> .025f; 3 -> .035f; else -> 0f }
-        val store = UiStore(this)
-        if (store.cloudTextScaleEnabled) {
-            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * store.cloudTextScalePercent.coerceIn(80, 140) / 100f)
-        }
-        if (!view.hint.isNullOrBlank()) view.setHintTextColor(cloudHintColor())
-    }
-    if (view is ViewGroup) repeat(view.childCount) { applyCloudTypography(view.getChildAt(it)) }
+    ThemeTypography.apply(view)
 }
 
 class CloudMineActivity : AppCompatActivity() {
@@ -228,8 +227,7 @@ class CloudMineActivity : AppCompatActivity() {
             ))
             addView(sectionTitle("设置"))
             addView(sectionList(
-                actionRow("主题", leadingIcon = DesignR.drawable.ic_baseline_brightness_4) { startActivity(Intent(this@CloudMineActivity, AppSettingsActivity::class.java)) },
-                actionRow("一键换肤", leadingIcon = DesignR.drawable.ic_baseline_extension) { open("skin") },
+                actionRow("一键换肤", leadingIcon = DesignR.drawable.ic_baseline_brightness_4) { open("skin") },
                 actionRow("设置", leadingIcon = DesignR.drawable.ic_baseline_settings) { startActivity(Intent(this@CloudMineActivity, SettingsActivity::class.java)) },
             ))
             addView(sectionTitle("其他"))
@@ -237,7 +235,7 @@ class CloudMineActivity : AppCompatActivity() {
                 actionRow("Telegram频道", "获取服务通知和最新动态", DesignR.drawable.ic_baseline_publish) {
                     runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(BuildConfig.BRAND_TELEGRAM_URL))) }.onFailure { toast(it) }
                 },
-                actionRow("检查更新", "当前版本 v${BuildConfig.BRAND_VERSION_NAME}", DesignR.drawable.ic_outline_update) {
+                actionRow("检查更新", getString(DesignR.string.cloud_current_version, ClientVersion.display(BuildConfig.BRAND_VERSION_NAME)), DesignR.drawable.ic_outline_update) {
                     lifecycleScope.launch { runCatching { CloudReleaseManager.checkUpdate(this@CloudMineActivity) }.onFailure { toast(it) } }
                 },
                 actionRow("清除远端缓存", leadingIcon = DesignR.drawable.ic_baseline_clear_all) { confirmRefreshServiceConfig() },
@@ -258,25 +256,39 @@ class CloudMineActivity : AppCompatActivity() {
             )
         }.also { applyCloudTypography(it) })
         lifecycleScope.launch {
-            runCatching { CloudApi(this@CloudMineActivity).subscription() }.onSuccess { subscription ->
-                accountEmail = subscription.email
-                accountView.text = maskEmail(subscription.email)
-                val text = if (subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()) {
-                    "已过期"
-                } else if (subscription.expiresAt > 0) {
-                    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
-                        .format(java.util.Date(subscription.expiresAt * 1000))
-                } else "不限时长"
-                expiryView.text = "到期时间：$text"
-                balanceView.text = "钱包余额：¥${formatBalance(subscription.balance)}"
-                planView.text = "当前套餐：${subscription.plan.ifBlank { "未开通" }}"
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                CloudSubscriptionCache.changes.collect {
+                    CloudSubscriptionCache.peek(this@CloudMineActivity)?.let(::renderMembership)
+                }
             }
         }
     }
 
+    private fun renderMembership(subscription: CloudSubscription) {
+        accountEmail = subscription.email
+        accountView.text = maskEmail(subscription.email)
+        val text = if (subscription.expiresAt > 0 && subscription.expiresAt * 1000 < System.currentTimeMillis()) {
+            "已过期"
+        } else if (subscription.expiresAt > 0) {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault())
+                .format(java.util.Date(subscription.expiresAt * 1000))
+        } else "不限时长"
+        expiryView.text = "到期时间：$text"
+        balanceView.text = "钱包余额：¥${formatBalance(subscription.balance)}"
+        planView.text = "当前套餐：${subscription.plan.ifBlank { "未开通" }}"
+    }
+
     override fun onResume() {
         super.onResume()
-        if (appliedThemeSignature.isNotEmpty() && appliedThemeSignature != themeSignature()) recreate()
+        if (appliedThemeSignature.isNotEmpty() && appliedThemeSignature != themeSignature()) {
+            recreate()
+            return
+        }
+        CloudSubscriptionCache.peek(this)?.let(::renderMembership)
+        lifecycleScope.launch {
+            runCatching { CloudApi(this@CloudMineActivity).subscription() }
+                .onSuccess(::renderMembership)
+        }
     }
 
     private fun themeSignature(): String = UiStore(this).let { "${it.darkMode}:${it.cloudThemeStyle}:${it.pureBlack}" }
@@ -309,7 +321,7 @@ class CloudMineActivity : AppCompatActivity() {
             .setMessage(DesignR.string.cloud_logout_confirm)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(android.R.string.ok) { _, _ -> performLogout() }
-            .show()
+            .showThemed()
     }
 
     private fun confirmRefreshServiceConfig() {
@@ -320,32 +332,44 @@ class CloudMineActivity : AppCompatActivity() {
             .setPositiveButton("刷新") { _, _ ->
                 CloudApi(this).clearRemoteConfigCache()
                 lifecycleScope.launch {
-                    runCatching { CloudApi(this@CloudMineActivity).remoteConfig() }
+                    runCatching {
+                        withCloudRequestLoading("正在刷新服务配置…") {
+                            CloudApi(this@CloudMineActivity).remoteConfig()
+                        }
+                    }
                         .onSuccess { Toast.makeText(this@CloudMineActivity, "服务配置已刷新", Toast.LENGTH_SHORT).show() }
                         .onFailure { toast(it) }
                 }
             }
-            .show()
+            .showThemed()
     }
 
     private fun performLogout() {
-        val progress = AlertDialog.Builder(this)
-            .setTitle(DesignR.string.cloud_logout_progress_title)
-            .setMessage(DesignR.string.cloud_logout_progress_message)
-            .setCancelable(false)
-            .show()
+        val progress = CloudRequestLoading(this, getString(DesignR.string.cloud_logout_progress_message))
+        progress.show()
         lifecycleScope.launch {
             val session = CloudSession(this@CloudMineActivity)
             val profileId = session.profileUuid
             stopClashService()
             delay(500)
             runCatching {
-                profileId?.let { id -> withProfile { delete(UUID.fromString(id)) } }
+                withCloudProfileSync {
+                    withProfile {
+                        deleteCloudProfiles()
+                        profileId
+                            ?.let { id -> runCatching { UUID.fromString(id) }.getOrNull() }
+                            ?.takeIf { id -> queryByUUID(id) != null }
+                            ?.let { id -> delete(id) }
+                    }
+                }
             }
             session.clear()
+            filesDir.resolve("ddns-config.json").delete()
+            filesDir.resolve("ddns-runtime.json").delete()
             getSharedPreferences("cloud_config", MODE_PRIVATE).edit().clear().apply()
             getSharedPreferences("cloud_connection_clock", MODE_PRIVATE).edit().clear().apply()
             getSharedPreferences("cloud_membership_cache", MODE_PRIVATE).edit().clear().apply()
+            getSharedPreferences("cloud_dashboard_state", MODE_PRIVATE).edit().clear().apply()
             progress.dismiss()
             val login = Intent(this@CloudMineActivity, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
@@ -356,9 +380,12 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun vipBanner(): View = LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = dp(112)
         setPadding(dp(15), dp(15), dp(15), dp(15))
         background = roundRect("#FFFFFF", 14, "#E0E0E0")
         isClickable = true; isFocusable = true; setOnClickListener { open("plans") }
+        SakuraCards.apply(this, featured = true)
+        if (SakuraCards.enabled(context)) setPadding(dp(18), dp(18), dp(18), dp(18))
         addView(vertical().apply {
             var revealed = false
             accountView = TextView(this@CloudMineActivity).apply {
@@ -391,7 +418,8 @@ class CloudMineActivity : AppCompatActivity() {
             setImageResource(R.drawable.cloud_vip_flag); scaleType = ImageView.ScaleType.CENTER_INSIDE
         }, LinearLayout.LayoutParams(dp(63), dp(30)).apply { marginStart = dp(8) })
     }.also {
-        it.layoutParams = LinearLayout.LayoutParams(-1, dp(96)).apply {
+        // Four text rows, theme fonts and accessibility scaling must determine height.
+        it.layoutParams = LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             marginStart = dp(16); marginEnd = dp(16); topMargin = dp(12); bottomMargin = dp(8)
         }
     }
@@ -409,7 +437,21 @@ class CloudMineActivity : AppCompatActivity() {
 
     private fun sectionList(vararg rows: View) = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
+        if (SakuraCards.enabled(context)) {
+            SakuraCards.apply(this)
+            clipToOutline = true
+            setPadding(0, dp(4), 0, dp(4))
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply {
+                marginStart = dp(16); marginEnd = dp(16); bottomMargin = dp(4)
+            }
+        }
         rows.forEachIndexed { index, row ->
+            if (SakuraCards.enabled(context)) {
+                row.background = android.graphics.drawable.RippleDrawable(
+                    android.content.res.ColorStateList.valueOf(resolveThemedColor(com.google.android.material.R.attr.colorControlHighlight)),
+                    null, GradientDrawable().apply { setColor(Color.WHITE) },
+                )
+            }
             if (index > 0) addView(View(this@CloudMineActivity).apply {
                 setBackgroundColor(cloudOutlineColor())
             }, LinearLayout.LayoutParams(-1, borderPx()).apply {
@@ -465,12 +507,14 @@ class CloudMineActivity : AppCompatActivity() {
 
 class CloudBusinessActivity : AppCompatActivity() {
     private lateinit var content: LinearLayout
-    private lateinit var loading: ProgressBar
     private lateinit var pageRoot: LinearLayout
     private lateinit var headerView: LinearLayout
     private val api by lazy { CloudApi(this) }
     private val type by lazy { intent.getStringExtra("type") ?: "plans" }
     private var creatingOrder = false
+    private var orderActionRunning = false
+    private var plansRefreshRunning = false
+    private var inviteCodeRetryRunning = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         applyCloudTheme()
@@ -483,8 +527,6 @@ class CloudBusinessActivity : AppCompatActivity() {
             else setPadding(dp(14), dp(14), dp(14), dp(24))
         }
         content.setBackgroundColor(cloudColor("#FAFAFA"))
-        loading = ProgressBar(this)
-        content.addView(loading, LinearLayout.LayoutParams(-1, dp(48)))
         headerView = pageHeader(pageTitle)
         pageRoot = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -499,7 +541,9 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     override fun onRestart() {
         super.onRestart()
-        if (type == "tickets") recreate()
+        if (type == "tickets") lifecycleScope.launch {
+            runCatching { refreshTicketsInPlace("正在刷新反馈…") }.onFailure { toast(it) }
+        }
     }
 
     private fun pageHeader(pageTitle: String): LinearLayout = LinearLayout(this).apply {
@@ -528,26 +572,137 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     private fun reload() = lifecycleScope.launch {
-        loading.visibility = View.VISIBLE
         try {
-            when (type) {
-                "plans" -> renderPlans(loadPlansWithCache(), runCatching { api.subscription() }.getOrNull())
-                "plan_detail" -> renderPlanDetails(api.planDetails(intent.getStringExtra("plan_id").orEmpty()))
-                "payment" -> renderPayment(intent.getStringExtra("pay_url").orEmpty(), intent.getStringExtra("trade_no").orEmpty())
-                "pay_success" -> renderPaymentSuccess(intent.getStringExtra("trade_no").orEmpty())
-                "orders" -> renderOrders(api.orders())
-                "invite" -> renderInvite(api.inviteSummary(), api.inviteDetails(), api.userInfo())
-                "tickets" -> renderTickets(api.tickets())
-                "ticket_detail" -> renderTicketConversation(api.ticketDetails(intent.getStringExtra("ticket_id").orEmpty()))
-                "ticket_create" -> renderTicketCreate()
-                "skin" -> renderSkin()
+            if (type == "plans") {
+                renderPlansPreloaded()
+            } else if (type in setOf("payment", "pay_success", "ticket_create", "skin")) {
+                renderPage()
+            } else {
+                withCloudRequestLoading("正在加载页面内容…") { renderPage() }
             }
         } catch (e: Throwable) {
             addText(e.message ?: "加载失败", 14f, "#B00020")
         } finally {
-            loading.visibility = View.GONE
             applyCloudTypography(pageRoot)
         }
+    }
+
+    private suspend fun renderPage() {
+        when (type) {
+            "plan_detail" -> renderPlanDetails(api.planDetails(intent.getStringExtra("plan_id").orEmpty()))
+            "payment" -> renderPayment(intent.getStringExtra("pay_url").orEmpty(), intent.getStringExtra("trade_no").orEmpty())
+            "pay_success" -> renderPaymentSuccess(intent.getStringExtra("trade_no").orEmpty())
+            "orders" -> renderOrders(api.orders())
+            "invite" -> renderInvite(api.inviteSummaryWithCode(), api.inviteDetails(), api.userInfo())
+            "tickets" -> renderTickets(api.tickets())
+            "ticket_detail" -> renderTicketConversation(api.ticketDetails(intent.getStringExtra("ticket_id").orEmpty()))
+            "ticket_create" -> renderTicketCreate()
+            "skin" -> renderSkin()
+        }
+    }
+
+    private suspend fun renderPlansPreloaded() {
+        val cachedPlans = readCachedPlans()
+        if (cachedPlans != null) {
+            renderPlans(cachedPlans, readCachedCloudSubscription())
+            applyCloudTypography(pageRoot)
+        } else {
+            renderPlanPlaceholders()
+        }
+        refreshPlans(showLoading = false, clearPlaceholderOnFailure = cachedPlans == null)
+    }
+
+    private suspend fun refreshPlans(showLoading: Boolean, clearPlaceholderOnFailure: Boolean = false) {
+        if (plansRefreshRunning) return
+        plansRefreshRunning = true
+        try {
+            val request: suspend () -> Pair<JSONObject, CloudSubscription?> = {
+                api.plans() to runCatching { api.subscription() }.getOrNull()
+            }
+            val (plans, subscription) = if (showLoading) {
+                withCloudRequestLoading("正在刷新套餐…") { request() }
+            } else {
+                request()
+            }
+            getSharedPreferences("cloud_business_cache", MODE_PRIVATE)
+                .edit().putString("plans", plans.toString()).apply()
+            content.removeAllViews()
+            renderPlans(plans, subscription ?: readCachedCloudSubscription())
+            applyCloudTypography(pageRoot)
+        } catch (error: Throwable) {
+            if (clearPlaceholderOnFailure) {
+                content.removeAllViews()
+                addText(error.message ?: "套餐列表加载失败", 14f, "#B00020")
+            } else if (showLoading) {
+                toast(error)
+            }
+        } finally {
+            plansRefreshRunning = false
+        }
+    }
+
+    private fun readCachedPlans(): JSONObject? = runCatching {
+        val value = getSharedPreferences("cloud_business_cache", MODE_PRIVATE)
+            .getString("plans", "").orEmpty()
+        value.takeIf { it.isNotBlank() }?.let(::JSONObject)
+    }.getOrNull()
+
+    private fun readCachedCloudSubscription(): CloudSubscription? {
+        val account = CloudSession(this).email.trim().lowercase()
+        if (account.isBlank()) return null
+        return runCatching {
+            val value = getSharedPreferences("cloud_membership_cache", MODE_PRIVATE)
+                .getString("membership", "").orEmpty()
+            val json = JSONObject(value)
+            if (json.optString("account_email") != account) return null
+            CloudSubscription(
+                email = json.optString("email", account),
+                planId = if (json.isNull("plan_id")) null else json.optLong("plan_id"),
+                plan = json.optString("plan"),
+                subscribeUrl = json.optString("subscribe_url"),
+                used = json.optLong("used"),
+                total = json.optLong("total"),
+                expiresAt = json.optLong("expires_at"),
+                balance = json.optLong("balance"),
+            )
+        }.getOrNull()
+    }
+
+    private fun renderPlanPlaceholders() {
+        fun placeholder(width: Int, height: Int) = View(this).apply {
+            background = GradientDrawable().apply {
+                setColor(cloudColor("#EEEEEE"))
+                cornerRadius = dp(8).toFloat()
+            }
+            alpha = .72f
+        }.also { view ->
+            view.layoutParams = LinearLayout.LayoutParams(dp(width), dp(height))
+        }
+
+        content.addView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(15), dp(25), dp(15), dp(10))
+            addView(placeholder(112, 22))
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(15), dp(15), dp(15), dp(15))
+                background = roundedCard()
+                addView(placeholder(170, 18))
+                addView(placeholder(126, 12), LinearLayout.LayoutParams(dp(126), dp(12)).apply { topMargin = dp(10) })
+                addView(placeholder(150, 12), LinearLayout.LayoutParams(dp(150), dp(12)).apply { topMargin = dp(7) })
+            }, LinearLayout.LayoutParams(-1, dp(104)).apply { topMargin = dp(18); bottomMargin = dp(20) })
+            repeat(3) {
+                addView(LinearLayout(this@CloudBusinessActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(14), dp(14), dp(14), dp(14))
+                    background = roundedCard()
+                    addView(placeholder(156, 18))
+                    addView(placeholder(92, 14), LinearLayout.LayoutParams(dp(92), dp(14)).apply { topMargin = dp(10) })
+                    addView(placeholder(220, 12), LinearLayout.LayoutParams(dp(220), dp(12)).apply { topMargin = dp(14) })
+                    addView(placeholder(184, 12), LinearLayout.LayoutParams(dp(184), dp(12)).apply { topMargin = dp(8) })
+                }, LinearLayout.LayoutParams(-1, dp(126)).apply { bottomMargin = dp(10) })
+            }
+        }, LinearLayout.LayoutParams(-1, -1))
     }
 
     private fun renderSkin() {
@@ -576,7 +731,6 @@ class CloudBusinessActivity : AppCompatActivity() {
             if (store.cloudThemeStyle == value) return
             store.cloudThemeStyle = value
             refreshAllThemedActivities()
-            recreate()
         }
         fun optionCard(label: String, icon: String, selected: Boolean, click: () -> Unit) = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(16), 0, dp(16), 0)
@@ -627,7 +781,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 listOf(Triple(DarkMode.Auto, "◉", "自动"), Triple(DarkMode.ForceLight, "☀", "浅色"), Triple(DarkMode.ForceDark, "☾", "深色")).forEachIndexed { index, item ->
                     addView(optionCard(item.third, item.second, store.darkMode == item.first) {
-                        store.darkMode = item.first; refreshAllThemedActivities(); recreate()
+                        store.darkMode = item.first; refreshAllThemedActivities()
                     }, LinearLayout.LayoutParams(-2, dp(56)).apply { if (index > 0) marginStart = dp(16) })
                 }
             })
@@ -658,7 +812,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             addView(Switch(this@CloudBusinessActivity).apply {
                 isChecked = store.pureBlack
                 setOnCheckedChangeListener { _, checked ->
-                    store.pureBlack = checked; refreshAllThemedActivities(); recreate()
+                    store.pureBlack = checked; refreshAllThemedActivities()
                 }
             })
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
@@ -674,7 +828,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             addView(Switch(this@CloudBusinessActivity).apply {
                 isChecked = store.cloudTextScaleEnabled
                 setOnCheckedChangeListener { _, checked ->
-                    store.cloudTextScaleEnabled = checked; refreshAllThemedActivities(); recreate()
+                    store.cloudTextScaleEnabled = checked; refreshAllThemedActivities()
                 }
             })
         })
@@ -689,7 +843,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                     }
                     override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                     override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                        refreshAllThemedActivities(); recreate()
+                        refreshAllThemedActivities()
                     }
                 })
             }, LinearLayout.LayoutParams(0, dp(44), 1f))
@@ -705,17 +859,6 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
     }
 
-    private suspend fun loadPlansWithCache(): JSONObject {
-        val prefs = getSharedPreferences("cloud_business_cache", MODE_PRIVATE)
-        return runCatching { api.plans() }
-            .onSuccess { prefs.edit().putString("plans", it.toString()).apply() }
-            .getOrElse { error ->
-                val cached = prefs.getString("plans", "").orEmpty()
-                if (cached.isBlank()) throw error
-                JSONObject(cached)
-            }
-    }
-
     private fun renderPlans(json: JSONObject, subscription: CloudSubscription?) {
         val membershipSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -729,7 +872,10 @@ class CloudBusinessActivity : AppCompatActivity() {
                 }, LinearLayout.LayoutParams(0, dp(48), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
                 addView(LinearLayout(this@CloudBusinessActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-                    isClickable = true; isFocusable = true; setOnClickListener { recreate() }
+                    isClickable = true; isFocusable = true
+                    setOnClickListener {
+                        lifecycleScope.launch { refreshPlans(showLoading = true) }
+                    }
                     addView(ImageView(this@CloudBusinessActivity).apply {
                         setImageResource(DesignR.drawable.ic_baseline_sync); setColorFilter(cloudPrimaryColor()); scaleType = ImageView.ScaleType.CENTER_INSIDE
                     }, LinearLayout.LayoutParams(dp(16), dp(16)))
@@ -785,6 +931,8 @@ class CloudBusinessActivity : AppCompatActivity() {
         gravity = Gravity.CENTER_VERTICAL
         setPadding(dp(15), dp(15), dp(15), dp(15))
         background = roundedCard()
+        SakuraCards.apply(this, featured = true)
+        if (SakuraCards.enabled(context)) setPadding(dp(18), dp(18), dp(18), dp(18))
         addView(LinearLayout(this@CloudBusinessActivity).apply {
             orientation = LinearLayout.VERTICAL
             val account = subscription?.email?.ifBlank { CloudSession(this@CloudBusinessActivity).email }
@@ -828,15 +976,22 @@ class CloudBusinessActivity : AppCompatActivity() {
         background = rounded("#FFFFFF", 12)
         elevation = dp(1).toFloat()
         isClickable = true; isFocusable = true
-        setOnClickListener { openPlanDetails(plan.optString("id")) }
+        setOnClickListener { openPlanDetails(plan) }
+        SakuraCards.apply(this)
+        if (SakuraCards.enabled(context)) setPadding(dp(18), dp(18), dp(18), dp(18))
         addView(LinearLayout(this@CloudBusinessActivity).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.TOP
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = plan.optString("name", "套餐"); textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD); maxLines = 2
             }, LinearLayout.LayoutParams(0, -2, 1f))
             if (planPrice(plan, "onetime_price") > 0) addView(TextView(this@CloudBusinessActivity).apply {
-                text = "限时返场"; textSize = 11f; setTextColor(Color.parseColor("#E67817")); gravity = Gravity.CENTER
-                setPadding(dp(8), dp(3), dp(8), dp(3)); background = rounded("#FFF3E8", 99, "#F2C28F")
+                text = "限时返场"; textSize = 11f; gravity = Gravity.CENTER
+                val sakura = UiStore(this@CloudBusinessActivity).cloudThemeStyle == 1
+                setTextColor(if (sakura) cloudSelectedTextColor() else Color.parseColor("#E67817"))
+                setPadding(dp(8), dp(3), dp(8), dp(3))
+                background = if (sakura) GradientDrawable().apply {
+                    setColor(cloudSelectedContainerColor()); cornerRadius = dp(99).toFloat()
+                } else rounded("#FFF3E8", 99, "#F2C28F")
             })
         })
         val startingPrice = listOf(
@@ -844,7 +999,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             "year_price", "two_year_price", "three_year_price",
         ).firstNotNullOfOrNull { key -> planPrice(plan, key).takeIf { it > 0 } } ?: 0
         addView(TextView(this@CloudBusinessActivity).apply {
-            text = "低至 ￥${money(startingPrice)}"; textSize = 14f; setTextColor(cloudErrorColor()); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(10))
+            text = "低至 ￥${money(startingPrice)}"; textSize = 14f; setTextColor(if (UiStore(this@CloudBusinessActivity).cloudThemeStyle == 1) cloudPrimaryColor() else cloudErrorColor()); setTypeface(typeface, Typeface.BOLD); gravity = Gravity.END; setPadding(0, dp(6), 0, dp(10))
         })
         val rights = parseRights(plan.optString("content"))
         addView(CloudFlowLayout(this@CloudBusinessActivity, dp(8), dp(8)).apply {
@@ -868,17 +1023,44 @@ class CloudBusinessActivity : AppCompatActivity() {
         })
     }
 
-    private fun openPlanDetails(planId: String) {
-        startActivity(Intent(this, CloudBusinessActivity::class.java).putExtra("type", "plan_detail").putExtra("plan_id", planId))
+    private fun openPlanDetails(plan: JSONObject) {
+        startActivity(Intent(this, CloudBusinessActivity::class.java)
+            .putExtra("type", "plan_detail")
+            .putExtra("plan_id", plan.optString("id"))
+            .putExtra("plan_json", plan.toString()))
     }
 
     private fun renderPlanDetails(response: JSONObject) {
+        val requestedPlanId = intent.getStringExtra("plan_id").orEmpty()
+        val cachedPlan = runCatching {
+            intent.getStringExtra("plan_json")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::JSONObject)
+        }.getOrNull()
         val raw = response.opt("data")
-        val plan = when (raw) {
-            is JSONObject -> raw
-            is JSONArray -> raw.optJSONObject(0)
+        val fetchedPlan = when (raw) {
+            is JSONObject -> raw.takeIf {
+                requestedPlanId.isBlank() || it.optString("id") == requestedPlanId
+            }
+            is JSONArray -> (0 until raw.length())
+                .mapNotNull { index -> raw.optJSONObject(index) }
+                .firstOrNull { it.optString("id") == requestedPlanId }
+                ?: raw.optJSONObject(0).takeIf { requestedPlanId.isBlank() }
             else -> null
-        } ?: return addText("商品详情加载失败", 14f, "#B00020")
+        }
+        val plan = fetchedPlan?.let { JSONObject(it.toString()) }
+            ?: cachedPlan?.let { JSONObject(it.toString()) }
+            ?: return addText("商品详情加载失败", 14f, "#B00020")
+        if (cachedPlan != null && cachedPlan.optString("id") == requestedPlanId) {
+            listOf(
+                "month_price", "quarter_price", "half_year_price", "year_price",
+                "two_year_price", "three_year_price", "onetime_price",
+            ).forEach { key ->
+                if (planPrice(plan, key) <= 0 && planPrice(cachedPlan, key) > 0) {
+                    plan.put(key, cachedPlan.opt(key))
+                }
+            }
+        }
         val periods = listOf(
             "onetime_price" to "一次性", "month_price" to "月付", "quarter_price" to "季付", "half_year_price" to "半年付",
             "year_price" to "年付", "two_year_price" to "两年付", "three_year_price" to "三年付",
@@ -887,23 +1069,46 @@ class CloudBusinessActivity : AppCompatActivity() {
 
         var selected = periods.first()
         var discount = 0L
+        var couponApplied = false
+        var couponType = 0
+        var couponValue = 0L
         val coupon = EditText(this).apply {
-            hint = "请输入优惠码"; isSingleLine = true
+            hint = "请输入优惠码".compactInputHint(this@CloudBusinessActivity); isSingleLine = true
             setTextColor(cloudColor("#212121")); setHintTextColor(cloudColor("#757575"))
             background = rounded("#F5F5F5", 12, "#E0E0E0")
             setPadding(dp(13), 0, dp(13), 0)
         }
-        val amount = TextView(this).apply { textSize = 16f; setTextColor(Color.parseColor("#ED492E")); setTypeface(typeface, Typeface.BOLD) }
+        val originalAmount = TextView(this).apply {
+            textSize = 12f
+            setTextColor(cloudColor("#757575"))
+            paintFlags = paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
+            visibility = View.GONE
+        }
+        val amount = TextView(this).apply {
+            textSize = 14f
+            setTextColor(cloudErrorColor())
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        fun recomputeDiscount() {
+            val original = planPrice(plan, selected.first)
+            discount = when {
+                !couponApplied -> 0
+                couponType == 2 -> original * couponValue / 100
+                else -> couponValue
+            }.coerceIn(0, original)
+        }
         fun updateAmount() {
             val original = planPrice(plan, selected.first)
             val payable = (original - discount).coerceAtLeast(0)
-            amount.text = if (discount > 0) "原价 ¥${money(original)}   应付 ¥${money(payable)}" else "应付金额：¥${money(payable)}"
+            originalAmount.text = "¥${money(original)}"
+            originalAmount.visibility = if (couponApplied && discount > 0) View.VISIBLE else View.GONE
+            amount.text = "¥${money(payable)}"
         }
 
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(18), dp(18), dp(18)); background = roundedCard()
             addView(TextView(this@CloudBusinessActivity).apply { text = plan.optString("name", "套餐"); textSize = 18f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD) })
-            addView(TextView(this@CloudBusinessActivity).apply { text = "低至 ¥${money(periods.minOf { planPrice(plan, it.first) })}"; textSize = 14f; setTextColor(Color.parseColor("#ED492E")); setPadding(0, dp(7), 0, dp(10)) })
+            addView(TextView(this@CloudBusinessActivity).apply { text = "低至 ¥${money(periods.minOf { planPrice(plan, it.first) })}"; textSize = 14f; setTextColor(if (UiStore(this@CloudBusinessActivity).cloudThemeStyle == 1) cloudPrimaryColor() else Color.parseColor("#ED492E")); setPadding(0, dp(7), 0, dp(10)) })
             addView(planContentWebView(plan.optString("content")))
         }, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(14) })
 
@@ -915,11 +1120,18 @@ class CloudBusinessActivity : AppCompatActivity() {
                 chips.addView(TextView(this).apply {
                     text = "${period.second}\n¥${money(planPrice(plan, period.first))}"; textSize = 13f; gravity = Gravity.CENTER
                     setTextColor(if (period == selected) cloudSelectedTextColor() else cloudColor("#212121")); setPadding(dp(6), dp(5), dp(6), dp(5))
-                    background = if (period == selected) GradientDrawable().apply {
+                    background = if (SakuraCards.enabled(context)) {
+                        SakuraCards.background(context, selected = period == selected, radius = 14f)
+                    } else if (period == selected) GradientDrawable().apply {
                         setColor(cloudSelectedContainerColor()); cornerRadius = dp(12).toFloat()
                         setStroke(borderPx(), cloudPrimaryColor())
                     } else rounded("#FFFFFF", 12, "#E0E0E0")
-                    isClickable = true; setOnClickListener { selected = period; discount = 0; redrawChips(); updateAmount() }
+                    isClickable = true; setOnClickListener {
+                        selected = period
+                        recomputeDiscount()
+                        redrawChips()
+                        updateAmount()
+                    }
                 }, GridLayout.LayoutParams().apply {
                     width = 0; height = dp(58); columnSpec = GridLayout.spec(index % 3, 1f); rowSpec = GridLayout.spec(index / 3)
                     setMargins(0, 0, if (index % 3 < 2) dp(8) else 0, dp(8))
@@ -936,21 +1148,65 @@ class CloudBusinessActivity : AppCompatActivity() {
             addView(TextView(this@CloudBusinessActivity).apply {
                 text = "验证"; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 12); isClickable = true
                 setOnClickListener { lifecycleScope.launch {
-                    runCatching { api.checkCoupon(coupon.text.toString().trim(), plan.optString("id")) }.onSuccess { result ->
+                    if (coupon.text.toString().trim().isEmpty()) {
+                        couponApplied = false
+                        discount = 0
+                        updateAmount()
+                        Toast.makeText(this@CloudBusinessActivity, "请输入优惠码", Toast.LENGTH_SHORT).show()
+                        return@launch
+                    }
+                    runCatching {
+                        withCloudRequestLoading("正在验证优惠码…") {
+                            api.checkCoupon(coupon.text.toString().trim(), plan.optString("id"))
+                        }
+                    }.onSuccess { result ->
                         val data = result.optJSONObject("data")
-                        val value = data?.optLong("value") ?: 0
-                        discount = if (data?.optInt("type") == 2) planPrice(plan, selected.first) * value / 100 else value
-                        if (result.isNull("data") || result.opt("data") == false) toast(IllegalStateException(result.optString("message", "优惠码无效"))) else { updateAmount(); Toast.makeText(this@CloudBusinessActivity, "优惠码可用", Toast.LENGTH_SHORT).show() }
-                    }.onFailure { toast(it) }
+                        if (data == null || result.isNull("data") || result.opt("data") == false) {
+                            couponApplied = false
+                            couponType = 0
+                            couponValue = 0
+                            discount = 0
+                            updateAmount()
+                            toast(IllegalStateException(result.optString("message", "优惠码无效")))
+                        } else {
+                            couponApplied = true
+                            couponType = data.optInt("type")
+                            couponValue = data.optLong("value")
+                            recomputeDiscount()
+                            updateAmount()
+                            Toast.makeText(this@CloudBusinessActivity, "优惠码可用", Toast.LENGTH_SHORT).show()
+                        }
+                    }.onFailure {
+                        couponApplied = false
+                        couponType = 0
+                        couponValue = 0
+                        discount = 0
+                        updateAmount()
+                        toast(it)
+                    }
                 } }
             }, LinearLayout.LayoutParams(dp(76), dp(48)).apply { marginStart = dp(10) })
         })
         updateAmount()
         pageRoot.addView(LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(18), dp(12), dp(18), dp(12)); setBackgroundColor(cloudColor("#FFFFFF")); elevation = dp(8).toFloat()
-            addView(amount, LinearLayout.LayoutParams(0, dp(48), 1f).apply { gravity = Gravity.CENTER_VERTICAL })
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+            background = roundedCard()
+            addView(LinearLayout(this@CloudBusinessActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(this@CloudBusinessActivity).apply {
+                    text = "订单金额："
+                    textSize = 15f
+                    setTextColor(cloudColor("#212121"))
+                })
+                addView(originalAmount)
+                addView(View(this@CloudBusinessActivity), LinearLayout.LayoutParams(dp(6), 1))
+                addView(amount)
+            }, LinearLayout.LayoutParams(0, -1, 1f))
             addView(TextView(this@CloudBusinessActivity).apply {
-                text = "立即购买"; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 18); isClickable = true
+                text = "立即购买"; gravity = Gravity.CENTER; setTextColor(cloudButtonTextColor()); background = rounded("#212121", 16); isClickable = true
                 setOnClickListener {
                     lifecycleScope.launch {
                         startPurchase(
@@ -961,8 +1217,8 @@ class CloudBusinessActivity : AppCompatActivity() {
                         )
                     }
                 }
-            }, LinearLayout.LayoutParams(dp(108), dp(42)))
-        }, LinearLayout.LayoutParams(-1, dp(72)))
+            }, LinearLayout.LayoutParams(dp(90), dp(32)))
+        }, LinearLayout.LayoutParams(-1, dp(74)))
     }
 
     private fun planContentWebView(raw: String): View {
@@ -971,21 +1227,24 @@ class CloudBusinessActivity : AppCompatActivity() {
         val htmlLinkColor = String.format("#%06X", 0xFFFFFF and cloudPrimaryColor())
         val webFont = when (UiStore(this).cloudThemeStyle) {
             0 -> "zen_maru_gothic_regular.ttf"
-            1 -> "barlow_condensed_regular.ttf"
+            1 -> "chill_round_m.ttf"
             2 -> "raleway_variable.ttf"
             3 -> "zcool_kuaile_regular.ttf"
             else -> null
         }
         val fontFace = webFont?.let { "@font-face{font-family:SkinFont;src:url('$it')}" }.orEmpty()
         val fontFamily = if (webFont == null) "sans-serif" else "SkinFont,sans-serif"
+        val typographyCss = if (UiStore(this).cloudThemeStyle == 1)
+            "body,body *{font-family:SkinFont,sans-serif!important;letter-spacing:0!important;font-synthesis:none;font-weight:400!important;font-variant-numeric:tabular-nums}h1,h2,h3{line-height:1.4}" else ""
         val html = """
             <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
             <style>$fontFace html,body{margin:0;padding:0;background:transparent;color:$htmlTextColor;font-family:$fontFamily;font-size:14px;line-height:1.75}p{margin:4px 0}a{color:$htmlLinkColor}img{max-width:100%;height:auto;border-radius:8px}ul,ol{padding-left:22px;margin:6px 0}table{max-width:100%;border-collapse:collapse}td,th{padding:6px;border:1px solid currentColor}</style>
-            </head><body>$raw</body></html>
+            <style>$typographyCss</style></head><body>$raw</body></html>
         """.trimIndent()
         return WebView(this).apply {
             setBackgroundColor(Color.TRANSPARENT)
             settings.javaScriptEnabled = true
+            settings.textZoom = (100 * ThemeTypography.scale(this@CloudBusinessActivity)).toInt()
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
             webViewClient = object : WebViewClient() {
@@ -1030,44 +1289,46 @@ class CloudBusinessActivity : AppCompatActivity() {
         if (creatingOrder) return
         creatingOrder = true
         try {
-            val orders = api.orders().optJSONArray("data") ?: JSONArray()
-            val hasPendingOrder = (0 until orders.length()).any {
-                orders.optJSONObject(it)?.optInt("status", -1) == 0
-            }
-            if (hasPendingOrder) {
-                AlertDialog.Builder(this)
-                    .setTitle("存在待支付订单")
-                    .setMessage("请先处理已有的待支付订单，再购买新的套餐。")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("查看订单") { _, _ -> openBusinessPage("orders") }
-                    .show()
-                return
-            }
+            withCloudRequestLoading("正在准备订单…") {
+                val orders = api.orders().optJSONArray("data") ?: JSONArray()
+                val hasPendingOrder = (0 until orders.length()).any {
+                    orders.optJSONObject(it)?.optInt("status", -1) == 0
+                }
+                if (hasPendingOrder) {
+                    AlertDialog.Builder(this@CloudBusinessActivity)
+                        .setTitle("存在待支付订单")
+                        .setMessage("请先处理已有的待支付订单，再购买新的套餐。")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("查看订单") { _, _ -> openBusinessPage("orders") }
+                        .showThemed()
+                    return@withCloudRequestLoading
+                }
 
-            val methods = api.paymentMethods().optJSONArray("data") ?: JSONArray()
-            val method = methods.optJSONObject(methods.length() - 1)
-                ?: throw IllegalStateException("暂无可用支付方式")
-            val methodId = method.optString("id")
-            if (methodId.isBlank()) throw IllegalStateException("支付方式不可用")
+                val methods = api.paymentMethods().optJSONArray("data") ?: JSONArray()
+                val method = methods.optJSONObject(methods.length() - 1)
+                    ?: throw IllegalStateException("暂无可用支付方式")
+                val methodId = method.optString("id")
+                if (methodId.isBlank()) throw IllegalStateException("支付方式不可用")
 
-            val orderResponse = api.createOrder(planId, period, coupon)
-            val tradeNo = when (val data = orderResponse.opt("data")) {
-                is JSONObject -> data.optString("trade_no")
-                null, JSONObject.NULL -> ""
-                else -> data.toString()
+                val orderResponse = api.createOrder(planId, period, coupon)
+                val tradeNo = when (val data = orderResponse.opt("data")) {
+                    is JSONObject -> data.optString("trade_no")
+                    null, JSONObject.NULL -> ""
+                    else -> data.toString()
+                }
+                if (tradeNo.isBlank()) throw IllegalStateException(orderResponse.optString("message", "订单创建失败"))
+                val detailsResponse = api.orderDetails(tradeNo)
+                val details = detailsResponse.optJSONObject("data") ?: JSONObject()
+                showOrderConfirmation(
+                    tradeNo = tradeNo,
+                    methodId = methodId,
+                    originalAmount = originalAmount,
+                    discountAmount = details.optLong("discount_amount"),
+                    surplusAmount = details.optLong("surplus_amount"),
+                    balanceAmount = details.optLong("balance_amount"),
+                    totalAmount = details.optLong("total_amount", originalAmount),
+                )
             }
-            if (tradeNo.isBlank()) throw IllegalStateException(orderResponse.optString("message", "订单创建失败"))
-            val detailsResponse = api.orderDetails(tradeNo)
-            val details = detailsResponse.optJSONObject("data") ?: JSONObject()
-            showOrderConfirmation(
-                tradeNo = tradeNo,
-                methodId = methodId,
-                originalAmount = originalAmount,
-                discountAmount = details.optLong("discount_amount"),
-                surplusAmount = details.optLong("surplus_amount"),
-                balanceAmount = details.optLong("balance_amount"),
-                totalAmount = details.optLong("total_amount", originalAmount),
-            )
         } catch (e: Throwable) {
             toast(e)
         } finally {
@@ -1132,11 +1393,18 @@ class CloudBusinessActivity : AppCompatActivity() {
         applyCloudTypography(sheet)
         dialog.setContentView(sheet)
         dialog.show()
+        dialog.window?.decorView?.let(ThemeTypography::install)
     }
 
     private suspend fun checkoutAndOpen(tradeNo: String, methodId: String) {
+        if (orderActionRunning) return
+        if (tradeNo.isBlank()) return toast(IllegalStateException("订单不存在"))
+        if (methodId.isBlank()) return toast(IllegalStateException("支付方式不可用"))
+        orderActionRunning = true
         try {
-            val response = api.checkout(tradeNo, methodId)
+            val response = withCloudRequestLoading("正在提交支付请求…") {
+                api.checkout(tradeNo, methodId)
+            }
             val url = response.opt("data")?.takeUnless { it == JSONObject.NULL }?.toString().orEmpty()
             if (response.optInt("type") == -1) {
                 openPaymentSuccess(tradeNo)
@@ -1150,6 +1418,8 @@ class CloudBusinessActivity : AppCompatActivity() {
             }
         } catch (e: Throwable) {
             toast(e)
+        } finally {
+            orderActionRunning = false
         }
     }
 
@@ -1254,7 +1524,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 if (!synchronized) {
                     val order = runCatching { api.orderDetails(tradeNo) }.getOrNull()?.optJSONObject("data")
                     if (order != null && order.optInt("status", 0) != 0) {
-                        synchronized = runCatching { api.subscription() }.isSuccess
+                        synchronized = runCatching { api.subscription(forceRefresh = true) }.isSuccess
                     }
                     if (!synchronized && attempt < 14) delay(2_000)
                 }
@@ -1278,6 +1548,9 @@ class CloudBusinessActivity : AppCompatActivity() {
             val tradeNo = order.optString("trade_no")
             content.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(12), dp(10), dp(10)); background = roundedCard()
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { if (tradeNo.isNotBlank()) showOrderDetails(tradeNo) }
                 addView(LinearLayout(this@CloudBusinessActivity).apply {
                     orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
                     addView(TextView(this@CloudBusinessActivity).apply { text = plan?.optString("name") ?: "订单"; textSize = 16f; setTextColor(cloudColor("#212121")); maxLines = 1 }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -1285,7 +1558,7 @@ class CloudBusinessActivity : AppCompatActivity() {
                 })
                 fun line(label: String, value: String) = TextView(this@CloudBusinessActivity).apply { text = "$label：$value"; textSize = 13f; setTextColor(cloudColor("#616161")); setPadding(0, dp(5), 0, 0) }
                 addView(line("订单号", tradeNo))
-                addView(line("下单时间", formatTimestamp(order.optLong("updated_at", order.optLong("created_at")))))
+                addView(line("下单时间", formatTimestamp(order.optLong("created_at"))))
                 addView(line("订单金额", "¥${money(orderOriginalAmount(order))}"))
                 if (order.optLong("discount_amount") > 0) addView(line("优惠金额（优惠券）", "¥${money(order.optLong("discount_amount"))}"))
                 if (order.optLong("surplus_amount") > 0) addView(line("旧订阅折抵金额", "¥${money(order.optLong("surplus_amount"))}"))
@@ -1313,45 +1586,208 @@ class CloudBusinessActivity : AppCompatActivity() {
     }
 
     private fun showOrderDetails(tradeNo: String) = lifecycleScope.launch {
-        runCatching { api.orderDetails(tradeNo) }.onSuccess { response ->
+        runCatching {
+            withCloudRequestLoading("正在获取订单详情…") { api.orderDetails(tradeNo) }
+        }.onSuccess { response ->
             val order = response.optJSONObject("data") ?: response
             val plan = order.optJSONObject("plan")?.optString("name").orEmpty()
+            val statusCode = order.optInt("status", -1)
+            val status = when (statusCode) { 0 -> "待支付"; 2 -> "已取消"; else -> "已完成" }
             val detail = buildString {
                 if (plan.isNotBlank()) append("套餐：$plan\n")
+                append("状态：$status\n")
                 append("订单号：${order.optString("trade_no", tradeNo)}\n")
-                append("金额：¥${money(order.optLong("total_amount"))}\n")
-                append("创建时间：${order.optString("created_at", "-")}")
+                append("订单金额：¥${money(orderOriginalAmount(order))}\n")
+                if (order.optLong("discount_amount") > 0) append("优惠券抵扣：¥${money(order.optLong("discount_amount"))}\n")
+                if (order.optLong("surplus_amount") > 0) append("旧订阅折抵：¥${money(order.optLong("surplus_amount"))}\n")
+                if (order.optLong("balance_amount") > 0) append("余额抵扣：¥${money(order.optLong("balance_amount"))}\n")
+                append("支付金额：¥${money(order.optLong("total_amount"))}\n")
+                append("创建时间：${formatTimestamp(order.optLong("created_at"))}")
             }
-            AlertDialog.Builder(this@CloudBusinessActivity).setTitle("订单详情").setMessage(detail).setPositiveButton("关闭", null).show()
+            val builder = AlertDialog.Builder(this@CloudBusinessActivity)
+                .setTitle("订单详情")
+                .setMessage(detail)
+            if (statusCode == 0) {
+                builder
+                    .setNeutralButton("关闭", null)
+                    .setNegativeButton("取消订单") { _, _ -> confirmCancel(tradeNo) }
+                    .setPositiveButton("付款") { _, _ -> lifecycleScope.launch { payExisting(tradeNo) } }
+            } else {
+                builder.setPositiveButton("关闭", null)
+            }
+            builder.showThemed()
         }.onFailure { toast(it) }
     }
 
     private suspend fun payExisting(tradeNo: String) {
+        if (orderActionRunning) return
+        if (tradeNo.isBlank()) return toast(IllegalStateException("订单不存在"))
+        orderActionRunning = true
         try {
-            val methods = api.paymentMethods().optJSONArray("data") ?: JSONArray()
-            val names = Array(methods.length()) { methods.optJSONObject(it)?.optString("name") ?: "支付" }
-            AlertDialog.Builder(this).setTitle("选择支付方式").setItems(names) { _, which ->
-                lifecycleScope.launch {
-                    try {
-                        val method = methods.optJSONObject(which)?.optString("id").orEmpty()
-                        val pay = api.checkout(tradeNo, method)
-                        val url = pay.opt("data")?.toString().orEmpty()
-                        if (url.startsWith("http")) startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        else Toast.makeText(this@CloudBusinessActivity, "支付请求已提交", Toast.LENGTH_LONG).show()
-                    } catch (e: Throwable) { toast(e) }
+            val methods = withCloudRequestLoading("正在获取支付方式…") {
+                api.paymentMethods()
+            }.optJSONArray("data") ?: JSONArray()
+            if (methods.length() == 0) throw IllegalStateException("暂无可用支付方式")
+            showExistingOrderPaymentSheet(tradeNo, methods)
+        } catch (e: Throwable) {
+            toast(e)
+        } finally {
+            orderActionRunning = false
+        }
+    }
+
+    private fun showExistingOrderPaymentSheet(tradeNo: String, methods: JSONArray) {
+        val availableMethods = (0 until methods.length())
+            .mapNotNull { index -> methods.optJSONObject(index) }
+            .filter { it.optString("id").isNotBlank() }
+        if (availableMethods.isEmpty()) return toast(IllegalStateException("暂无可用支付方式"))
+
+        val dialog = BottomSheetDialog(this)
+        var selectedMethodId = availableMethods.last().optString("id")
+        val choices = CloudFlowLayout(this, dp(8), dp(8))
+
+        fun redrawChoices() {
+            choices.removeAllViews()
+            availableMethods.forEach { method ->
+                val methodId = method.optString("id")
+                val selected = methodId == selectedMethodId
+                choices.addView(TextView(this).apply {
+                    text = method.optString("name", "支付")
+                    textSize = 14f
+                    gravity = Gravity.CENTER
+                    setPadding(dp(16), dp(9), dp(16), dp(9))
+                    setTextColor(if (selected) cloudSelectedTextColor() else cloudColor("#424242"))
+                    background = if (selected) GradientDrawable().apply {
+                        setColor(cloudSelectedContainerColor())
+                        cornerRadius = dp(18).toFloat()
+                        setStroke(borderPx(), cloudPrimaryColor())
+                    } else rounded("#FFFFFF", 18, "#E0E0E0")
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        selectedMethodId = methodId
+                        redrawChoices()
+                    }
+                }, ViewGroup.LayoutParams(-2, dp(38)))
+            }
+        }
+        redrawChoices()
+
+        val sheet = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(18), dp(16), dp(28))
+            setBackgroundColor(cloudColor("#FFFFFF"))
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "选择支付方式"
+                textSize = 16f
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(cloudColor("#212121"))
+            })
+            addView(choices, LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(14)
+                bottomMargin = dp(18)
+            })
+            addView(TextView(this@CloudBusinessActivity).apply {
+                text = "去支付"
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setTextColor(cloudButtonTextColor())
+                background = rounded("#212121", 22)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    val methodId = selectedMethodId
+                    dialog.dismiss()
+                    lifecycleScope.launch { checkoutAndOpen(tradeNo, methodId) }
                 }
-            }.show()
-        } catch (e: Throwable) { toast(e) }
+            }, LinearLayout.LayoutParams(-1, dp(44)))
+        }
+        applyCloudTypography(sheet)
+        dialog.setContentView(sheet)
+        dialog.show()
+        dialog.window?.decorView?.let(ThemeTypography::install)
     }
 
     private fun confirmCancel(tradeNo: String) {
         AlertDialog.Builder(this).setMessage("取消此订单？").setNegativeButton("返回", null).setPositiveButton("取消订单") { _, _ ->
-            lifecycleScope.launch { try { api.cancelOrder(tradeNo); recreate() } catch (e: Throwable) { toast(e) } }
-        }.show()
+            lifecycleScope.launch {
+                if (orderActionRunning) return@launch
+                orderActionRunning = true
+                try {
+                    val orders = withCloudRequestLoading("正在取消订单…") {
+                        val response = api.cancelOrder(tradeNo)
+                        check(response.optBoolean("data", false)) {
+                            response.optString("message", "订单取消失败")
+                        }
+                        runCatching { api.orders() }.getOrNull()
+                    }
+                    if (orders != null) {
+                        content.removeAllViews()
+                        renderOrders(orders)
+                        applyCloudTypography(pageRoot)
+                    }
+                    Toast.makeText(this@CloudBusinessActivity, "订单取消成功", Toast.LENGTH_SHORT).show()
+                } catch (e: Throwable) {
+                    toast(e)
+                } finally {
+                    orderActionRunning = false
+                }
+            }
+        }.showThemed()
     }
 
-    private fun renderInvite(summary: JSONObject, details: JSONObject, info: JSONObject) {
-        val data = summary.optJSONObject("data")
+    private fun clearDynamicBusinessContent() {
+        content.removeAllViews()
+        if (headerView.childCount > 2) {
+            headerView.removeViews(2, headerView.childCount - 2)
+        }
+        if (pageRoot.childCount > 2) {
+            pageRoot.removeViews(2, pageRoot.childCount - 2)
+        }
+    }
+
+    private suspend fun refreshInviteInPlace(
+        message: String,
+        beforeRefresh: (suspend () -> Unit)? = null,
+    ) {
+        val data = withCloudRequestLoading(message) {
+            beforeRefresh?.invoke()
+            Triple(api.inviteSummaryWithCode(), api.inviteDetails(), api.userInfo())
+        }
+        clearDynamicBusinessContent()
+        renderInvite(data.first, data.second, data.third)
+        applyCloudTypography(pageRoot)
+    }
+
+    private suspend fun refreshTicketsInPlace(
+        message: String,
+        beforeRefresh: (suspend () -> Unit)? = null,
+    ) {
+        val data = withCloudRequestLoading(message) {
+            beforeRefresh?.invoke()
+            api.tickets()
+        }
+        clearDynamicBusinessContent()
+        renderTickets(data)
+        applyCloudTypography(pageRoot)
+    }
+
+    private suspend fun refreshTicketConversationInPlace(
+        ticketId: String,
+        message: String,
+        beforeRefresh: (suspend () -> Unit)? = null,
+    ) {
+        val data = withCloudRequestLoading(message) {
+            beforeRefresh?.invoke()
+            api.ticketDetails(ticketId)
+        }
+        clearDynamicBusinessContent()
+        renderTicketConversation(data)
+        applyCloudTypography(pageRoot)
+    }
+
+    private fun renderInvite(summary: CloudInviteSummary, details: JSONObject, info: JSONObject) {
+        val data = summary.json.optJSONObject("data")
         val stats = data?.optJSONArray("stat") ?: JSONArray()
         fun heading(value: String) = TextView(this).apply {
             text = value; textSize = 16f; setTextColor(cloudColor("#212121")); setTypeface(typeface, Typeface.BOLD)
@@ -1392,15 +1828,7 @@ class CloudBusinessActivity : AppCompatActivity() {
         if (commission > 0) statCard.addView(actionButton("提现到余额", true) { confirmCommissionTransfer(commission) }, LinearLayout.LayoutParams(dp(110), dp(38)).apply { gravity = Gravity.END; topMargin = dp(6) })
         content.addView(statCard, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
         content.addView(heading("我的邀请码"))
-        val codes = data?.optJSONArray("codes") ?: data?.optJSONArray("code")
-        var newestCode = ""
-        var newestTime = Long.MIN_VALUE
-        if (codes != null) repeat(codes.length()) { index ->
-            val item = codes.optJSONObject(index) ?: return@repeat
-            val time = item.optLong("updated_at", item.optLong("created_at"))
-            if (item.optString("code").isNotBlank() && time >= newestTime) { newestTime = time; newestCode = item.optString("code") }
-        }
-        val inviteCode = data?.optString("invite_code").orEmpty().ifBlank { newestCode }
+        val inviteCode = summary.code
         content.addView(LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(14), dp(10), dp(10), dp(10)); background = roundedCard()
             addView(TextView(this@CloudBusinessActivity).apply {
@@ -1411,8 +1839,21 @@ class CloudBusinessActivity : AppCompatActivity() {
                 setTextColor(cloudColor("#212121"))
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, dp(42), 1f))
-            addView(actionButton(if (inviteCode.isBlank()) "生成邀请码" else "复制邀请码", true) {
-                if (inviteCode.isBlank()) lifecycleScope.launch { runCatching { api.createInviteCode() }.onSuccess { recreate() }.onFailure { toast(it) } }
+            addView(actionButton(if (inviteCode.isBlank()) "重试生成" else "复制邀请码", true) {
+                if (inviteCode.isBlank()) lifecycleScope.launch {
+                    if (inviteCodeRetryRunning) return@launch
+                    inviteCodeRetryRunning = true
+                    try {
+                        // The shared read-before-create flow also protects manual retries.
+                        refreshInviteInPlace("正在获取邀请码…")
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        toast(failure)
+                    } finally {
+                        inviteCodeRetryRunning = false
+                    }
+                }
                 else {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("邀请码", inviteCode))
@@ -1420,6 +1861,14 @@ class CloudBusinessActivity : AppCompatActivity() {
                 }
             }, LinearLayout.LayoutParams(dp(112), dp(40)))
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8); bottomMargin = dp(20) })
+        summary.generationError?.let { message ->
+            content.addView(TextView(this).apply {
+                text = message
+                textSize = 12f
+                setTextColor(resolveThemedColor(com.google.android.material.R.attr.colorError))
+                setPadding(0, 0, 0, dp(12))
+            })
+        }
         val users = details.optJSONArray("data") ?: JSONArray()
         content.addView(heading("邀请返佣明细"))
         val records = LinearLayout(this).apply {
@@ -1456,8 +1905,19 @@ class CloudBusinessActivity : AppCompatActivity() {
     private fun confirmCommissionTransfer(amount: Long) {
         AlertDialog.Builder(this).setTitle("提现到余额").setMessage("确认将可提现佣金 ¥${money(amount)} 转入账户余额？")
             .setNegativeButton("取消", null).setPositiveButton("确认提现") { _, _ ->
-                lifecycleScope.launch { runCatching { api.transferCommission(amount) }.onSuccess { Toast.makeText(this@CloudBusinessActivity, "提现成功", Toast.LENGTH_SHORT).show(); recreate() }.onFailure { toast(it) } }
-            }.show()
+                lifecycleScope.launch {
+                    runCatching {
+                        refreshInviteInPlace("正在提交提现…") {
+                            api.transferCommission(amount)
+                            CloudSubscriptionCache.clear(this@CloudBusinessActivity)
+                            Unit
+                        }
+                    }.onSuccess {
+                        Toast.makeText(this@CloudBusinessActivity, "提现成功", Toast.LENGTH_SHORT).show()
+                    }
+                        .onFailure { toast(it) }
+                }
+            }.showThemed()
     }
 
     private fun renderTickets(json: JSONObject) {
@@ -1518,7 +1978,7 @@ class CloudBusinessActivity : AppCompatActivity() {
             }, LinearLayout.LayoutParams((resources.displayMetrics.widthPixels * 0.78f).toInt(), -2).apply { gravity = if (mine) Gravity.END else Gravity.START; bottomMargin = dp(10) })
         }
         if (!closed) {
-            val reply = EditText(this).apply { hint = "输入回复内容"; minLines = 1; maxLines = 4; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(8), dp(12), dp(8)) }
+            val reply = EditText(this).apply { hint = "输入回复内容".compactInputHint(this@CloudBusinessActivity); minLines = 1; maxLines = 4; background = rounded("#FFFFFF", 12, "#BDBDBD"); setPadding(dp(12), dp(8), dp(12), dp(8)) }
             pageRoot.addView(LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL; setPadding(dp(12), dp(8), dp(12), dp(8)); setBackgroundColor(cloudColor("#FFFFFF")); elevation = dp(8).toFloat()
                 addView(reply, LinearLayout.LayoutParams(0, -2, 1f))
@@ -1527,7 +1987,15 @@ class CloudBusinessActivity : AppCompatActivity() {
                     setOnClickListener {
                         val value = reply.text.toString().trim()
                         if (value.isEmpty()) Toast.makeText(this@CloudBusinessActivity, "请填写反馈内容", Toast.LENGTH_SHORT).show()
-                        else lifecycleScope.launch { runCatching { api.replyTicket(ticket.optString("id"), value) }.onSuccess { recreate() }.onFailure { toast(it) } }
+                        else lifecycleScope.launch {
+                            val ticketId = ticket.optString("id")
+                            runCatching {
+                                refreshTicketConversationInPlace(ticketId, "正在发送回复…") {
+                                    api.replyTicket(ticketId, value)
+                                    Unit
+                                }
+                            }.onFailure { toast(it) }
+                        }
                     }
                 }, LinearLayout.LayoutParams(dp(72), dp(42)).apply { marginStart = dp(8) })
             }, LinearLayout.LayoutParams(-1, -2))
@@ -1536,15 +2004,20 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun confirmCloseTicket(id: String) {
         AlertDialog.Builder(this).setTitle("关闭反馈").setMessage("确定关闭此反馈？关闭后将无法继续回复。").setNegativeButton("关闭", null).setPositiveButton("关闭反馈") { _, _ ->
-            lifecycleScope.launch { runCatching { api.closeTicket(id) }.onSuccess { finish() }.onFailure { toast(it) } }
-        }.show()
+            lifecycleScope.launch {
+                runCatching { withCloudRequestLoading("正在关闭反馈…") { api.closeTicket(id) } }
+                    .onSuccess { finish() }.onFailure { toast(it) }
+            }
+        }.showThemed()
     }
 
     private fun showTicketCreateSheet() {
         val dialog = BottomSheetDialog(this)
         val form = ticketCreateForm {
             dialog.dismiss()
-            recreate()
+            lifecycleScope.launch {
+                runCatching { refreshTicketsInPlace("正在刷新反馈…") }.onFailure { toast(it) }
+            }
         }
         applyCloudTypography(form)
         val scroll = ScrollView(this).apply {
@@ -1552,6 +2025,7 @@ class CloudBusinessActivity : AppCompatActivity() {
         }
         dialog.setContentView(scroll)
         dialog.show()
+        dialog.window?.decorView?.let(ThemeTypography::install)
     }
 
     private fun renderTicketCreate() {
@@ -1560,16 +2034,16 @@ class CloudBusinessActivity : AppCompatActivity() {
 
     private fun ticketCreateForm(onSubmitted: () -> Unit): View {
         val subject = EditText(this).apply {
-            hint = "补充反馈主题"
+            hint = "补充反馈主题".compactInputHint(this@CloudBusinessActivity)
             isSingleLine = true
             background = null
             setPadding(dp(4), 0, dp(10), 0)
             setTextColor(cloudColor("#212121"))
             setHintTextColor(cloudColor("#9E9E9E"))
         }
-        val subjectPrefix = "【客户端-安卓】[v${BuildConfig.BRAND_VERSION_NAME}]"
+        val subjectPrefix = "【客户端-安卓】[${ClientVersion.display(BuildConfig.BRAND_VERSION_NAME)}]"
         val message = EditText(this).apply {
-            hint = "请详细描述您的问题，不要恶意随便填写内容，严重者平台会直接清退账号"
+            hint = "请详细描述您的问题，不要恶意随便填写内容，严重者平台会直接清退账号".compactInputHint(this@CloudBusinessActivity)
             minLines = 4
             maxLines = 8
             gravity = Gravity.TOP or Gravity.START
@@ -1620,7 +2094,9 @@ class CloudBusinessActivity : AppCompatActivity() {
                 val suffix = subject.text.toString().trim(); val body = message.text.toString().trim()
                 val title = subjectPrefix + suffix
                 if (body.isBlank()) Toast.makeText(this@CloudBusinessActivity, "请填写反馈内容", Toast.LENGTH_SHORT).show()
-                else lifecycleScope.launch { runCatching { api.createTicket(title, level, body) }.onSuccess {
+                else lifecycleScope.launch { runCatching {
+                    withCloudRequestLoading("正在提交反馈…") { api.createTicket(title, level, body) }
+                }.onSuccess {
                     Toast.makeText(this@CloudBusinessActivity, "反馈已提交", Toast.LENGTH_SHORT).show()
                     onSubmitted()
                 }.onFailure { toast(it) } }
@@ -1660,7 +2136,8 @@ class CloudBusinessActivity : AppCompatActivity() {
         java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
     private fun formatTicketTimestamp(timestamp: Long, pattern: String) = if (timestamp <= 0) "" else
         java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(java.util.Date(timestamp * 1000))
-    private fun roundedCard() = GradientDrawable().apply { setColor(cloudColor("#FFFFFF")); cornerRadius = dp(14).toFloat(); setStroke(borderPx(), cloudOutlineColor()) }
+    private fun roundedCard() = if (SakuraCards.enabled(this)) SakuraCards.background(this) else
+        GradientDrawable().apply { setColor(cloudColor("#FFFFFF")); cornerRadius = dp(14).toFloat(); setStroke(borderPx(), cloudOutlineColor()) }
     private fun rounded(fill: String, radius: Int, stroke: String? = null) = GradientDrawable().apply {
         setColor(if (fill == "#212121") cloudPrimaryColor() else cloudColor(fill)); cornerRadius = dp(radius).toFloat()
         stroke?.let { setStroke(borderPx(), if (it == "#212121") cloudPrimaryColor() else cloudOutlineColor()) }

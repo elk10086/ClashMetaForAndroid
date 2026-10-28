@@ -210,6 +210,11 @@
             android:configChanges="uiMode"
             android:exported="false"
             android:label="@string/files" />
+        <activity
+            android:name=".YamlPreviewActivity"
+            android:configChanges="uiMode"
+            android:exported="false"
+            android:label="配置预览" />
 
         <service
             android:name=".LogcatService"

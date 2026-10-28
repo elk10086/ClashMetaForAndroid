@@ -5,6 +5,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
+import com.github.kr328.clash.design.util.ThemeTypography
 import java.io.File
 import java.util.zip.ZipFile
 
@@ -30,6 +31,7 @@ object ApplicationObserver {
         @Synchronized
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
             _createdActivities.add(activity)
+            ThemeTypography.install(activity.window.decorView)
         }
 
         @Synchronized

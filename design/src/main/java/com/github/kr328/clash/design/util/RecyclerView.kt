@@ -66,12 +66,18 @@ fun RecyclerView.invalidateChildren() {
     }
 }
 
-fun RecyclerView.bindInsets(surface: Surface, top: Int = 0, bottom: Int = 0) {
+fun RecyclerView.bindInsets(
+    surface: Surface,
+    top: Int = 0,
+    bottom: Int = 0,
+    start: Int = 0,
+    end: Int = 0,
+) {
     fun applyInsets() {
         val t = surface.insets.top + top
         val b = surface.insets.bottom + bottom
 
-        setPaddingRelative(0, t, 0, b)
+        setPaddingRelative(start, t, end, b)
     }
 
     surface.addOnPropertyChangedCallback(object : Observable.OnPropertyChangedCallback() {

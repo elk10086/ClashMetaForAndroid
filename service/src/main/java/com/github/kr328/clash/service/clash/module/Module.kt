@@ -16,7 +16,11 @@ import kotlinx.coroutines.withContext
 
 abstract class Module<E>(val service: Service) {
     private val events: Channel<E> = Channel(Channel.UNLIMITED)
-    private val receivers: MutableList<BroadcastReceiver> = mutableListOf()
+    // A Service can be destroyed before asynchronous module teardown finishes. Android
+    // automatically unregisters receivers owned by that Service Context at that point.
+    // Keep both operations on the same application Context so the module owns their lifetime.
+    private val broadcastContext = service.applicationContext
+    private val receivers = BroadcastRegistrations()
 
     val onEvent: SelectClause1<E>
         get() = events.onReceive
@@ -34,23 +38,22 @@ abstract class Module<E>(val service: Service) {
         val channel = Channel<Intent>(capacity)
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (context == null || intent == null) {
-                    channel.close()
-
-                    return
-                }
-
-                channel.trySend(intent)
+                if (intent != null) channel.trySend(intent)
             }
         }
 
-        if (requireSelf) {
-            service.registerReceiverCompat(receiver, filter, Permissions.RECEIVE_SELF_BROADCASTS, null)
-        } else {
-            service.registerReceiverCompat(receiver, filter)
-        }
-
-        receivers.add(receiver)
+        receivers.register(
+            register = {
+                broadcastContext.registerReceiverCompat(
+                    receiver,
+                    filter,
+                    if (requireSelf) Permissions.RECEIVE_SELF_BROADCASTS else null,
+                    null
+                )
+            },
+            unregister = { broadcastContext.unregisterReceiver(receiver) },
+            closeChannel = { channel.cancel() }
+        )
 
         return channel
     }
@@ -64,11 +67,7 @@ abstract class Module<E>(val service: Service) {
             run()
         } finally {
             withContext(NonCancellable) {
-                receivers.forEach {
-                    it.onReceive(null, null)
-
-                    service.unregisterReceiver(it)
-                }
+                receivers.close()
 
                 Log.d("$moduleName: destroyed")
             }

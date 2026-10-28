@@ -1,5 +1,6 @@
 package com.github.kr328.clash
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -27,6 +28,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.github.kr328.clash.common.constants.ClientUserAgent
 import com.github.kr328.clash.design.util.resolveThemedColor
+import com.github.kr328.clash.design.util.ClientVersion
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
@@ -113,10 +115,10 @@ class CloudUpdateActivity : AppCompatActivity() {
             when {
                 forced -> "当前版本过低，请下载安装新版本后重新登录使用。"
                 latest -> "当前已是最新版本"
-                else -> "发现新版本 v$remote"
+                else -> "发现新版本 ${ClientVersion.display(remote)}"
             }, 20f, true,
         ))
-        addView(label("远端版本：v${remote.ifBlank { local }}   本地版本：v$local", 13f).apply {
+        addView(label("远端版本：${ClientVersion.display(remote.ifBlank { local })}\n本地版本：${ClientVersion.display(local)}", 13f).apply {
             setTextColor(color(com.google.android.material.R.attr.colorOnSurfaceVariant))
             setPadding(dp(12), dp(10), dp(12), dp(10)); background = rounded(surfaceVariant(), 12)
         }, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(16) })
@@ -128,7 +130,7 @@ class CloudUpdateActivity : AppCompatActivity() {
         addView(downloadCard("Android", downloadUrl, primary = true, showDownload = !latest))
         val otherUrls = platformUrls()
         if (otherUrls.isNotEmpty()) {
-            addView(label("其他平台下载地址", 16f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14); bottomMargin = dp(8) })
+            addView(label("其他客户端下载地址", 16f, true), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14); bottomMargin = dp(8) })
             otherUrls.forEach { (platform, url) ->
                 addView(downloadCard(platform, url, primary = false, showDownload = !latest), LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
             }
@@ -142,7 +144,7 @@ class CloudUpdateActivity : AppCompatActivity() {
 
     private fun platformUrls(): List<Pair<String, String>> {
         val json = runCatching { JSONObject(intent.getStringExtra(EXTRA_PLATFORM_URLS).orEmpty()) }.getOrNull() ?: return emptyList()
-        return listOf("iOS", "Windows", "macOS").mapNotNull { platform ->
+        return listOf("iOS", "macOS", "Windows").mapNotNull { platform ->
             json.optString(platform).trim().takeIf(String::isNotEmpty)?.let { platform to it }
         }
     }
@@ -323,14 +325,47 @@ class CloudUpdateActivity : AppCompatActivity() {
     private fun requestInstall(file: File) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
             pendingInstaller = file
-            startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            runCatching {
+                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+            }.onFailure {
+                pendingInstaller = null
+                Toast.makeText(this, "无法打开“安装未知应用”设置，请在系统设置中允许本应用安装更新", Toast.LENGTH_LONG).show()
+            }
         } else launchInstaller(file)
     }
 
     private fun launchInstaller(file: File) {
+        if (!file.isFile || file.length() <= 0L) {
+            Toast.makeText(this, "更新包不存在，请重新下载", Toast.LENGTH_LONG).show()
+            return
+        }
         val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-        startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
+        val installer = Intent(Intent.ACTION_INSTALL_PACKAGE).apply {
+            data = uri
+            clipData = ClipData.newRawUri("update.apk", uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+            putExtra(Intent.EXTRA_RETURN_RESULT, false)
+        }
+
+        // Some package installers do not retain the transient flag from an implicit
+        // intent. Grant every matching installer explicit access to the FileProvider URI.
+        packageManager.queryIntentActivities(installer, 0).forEach { target ->
+            grantUriPermission(target.activityInfo.packageName, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        try {
+            startActivity(installer)
+        } catch (_: ActivityNotFoundException) {
+            val fallback = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                clipData = ClipData.newRawUri("update.apk", uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            runCatching { startActivity(fallback) }.onFailure {
+                Toast.makeText(this, "系统中没有可用的 APK 安装程序，请从下载地址手动安装", Toast.LENGTH_LONG).show()
+            }
+        }
     }
 
     private fun copyAddress(url: String, title: String) {

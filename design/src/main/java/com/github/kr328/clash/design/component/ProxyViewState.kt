@@ -4,8 +4,10 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
+import android.text.TextPaint
 import com.github.kr328.clash.core.model.Proxy
 import com.github.kr328.clash.design.model.ProxyState
+import com.github.kr328.clash.design.util.formatProxyDelay
 import kotlin.math.absoluteValue
 import kotlin.math.max
 
@@ -15,17 +17,22 @@ class ProxyViewState(
     private val parent: ProxyState,
     private val link: ProxyState?
 ) {
-    val paint = Paint()
+    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG)
     val rect = Rect()
     val path = Path()
+    val testing: Boolean get() = parent.testing
 
     var title: String = ""
     var subtitle: String = ""
+    var server: String = ""
     var delayText: String = ""
+    var delayUntested: Boolean = true
+    var delayColor: Int = config.unselectedControl
     var background: Int = config.unselectedBackground
     var controls: Int = config.unselectedControl
+    var outline: Int = config.unselectedOutline
 
-    private var delay: Int = 0
+    private var delay: Int = Int.MIN_VALUE
     private var selected: Boolean = false
     private var parentNow: String = ""
     private var linkNow: String? = null
@@ -35,6 +42,7 @@ class ProxyViewState(
     fun update(snap: Boolean): Boolean {
         val frameTime = System.currentTimeMillis()
         var invalidate = false
+        server = if (config.showTechnicalDetails) proxy.server else ""
 
         if (proxy.isGroup) {
             title = proxy.name
@@ -52,13 +60,20 @@ class ProxyViewState(
                 }
             }
         } else {
-            title = proxy.title
-            subtitle = proxy.subtitle
+            title = proxy.name
+            subtitle = if (config.showTechnicalDetails) proxy.type else ""
         }
 
         if (delay != proxy.delay) {
             delay = proxy.delay
-            delayText = if (proxy.delay in 0..Short.MAX_VALUE) proxy.delay.toString() else ""
+            delayText = formatProxyDelay(proxy.delay)
+            delayUntested = proxy.delay == 0
+            delayColor = when {
+                proxy.delay < 0 || proxy.delay > Short.MAX_VALUE -> config.delayFailed
+                proxy.delay == 0 -> config.delayUntested
+                proxy.delay < 600 -> config.delayGood
+                else -> config.delaySlow
+            }
         }
 
         if (parentNow !== parent.now) {
@@ -67,6 +82,11 @@ class ProxyViewState(
         }
 
         controls = if (selected) config.selectedControl else config.unselectedControl
+        outline = if (selected) config.selectedOutline else config.unselectedOutline
+
+        if (delay == 0) {
+            delayColor = config.delayUntested
+        }
 
         if (snap) {
             background = if (selected) config.selectedBackground else config.unselectedBackground

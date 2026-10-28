@@ -29,6 +29,7 @@ class ProfileManager(private val context: Context) : IProfileManager,
         launch {
             Database.database //.init
 
+            ProfileStorage.migrateExistingProfiles(context)
             ProfileReceiver.rescheduleAll(context)
         }
     }
@@ -50,13 +51,19 @@ class ProfileManager(private val context: Context) : IProfileManager,
 
         PendingDao().insert(pending)
 
-        context.pendingDir.resolve(uuid.toString()).apply {
-            deleteRecursively()
-            mkdirs()
+        val directory = context.pendingDir.resolve(uuid.toString())
+        try {
+            directory.apply {
+                deleteRecursively()
+                mkdirs()
 
-            @Suppress("BlockingMethodInNonBlockingContext")
-            resolve("config.yaml").createNewFile()
-            resolve("providers").mkdir()
+                ProfileStorage.write(resolve("config.yaml"), byteArrayOf(), context)
+                check(resolve("providers").mkdir()) { "Unable to create providers directory" }
+            }
+        } catch (e: Exception) {
+            PendingDao().remove(uuid)
+            directory.deleteRecursively()
+            throw e
         }
 
         return uuid

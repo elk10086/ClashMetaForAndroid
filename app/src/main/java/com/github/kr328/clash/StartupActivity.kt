@@ -28,6 +28,15 @@ class StartupActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // The launcher alias targets this activity so a cold launch can show
+        // the branded splash. After it hands off to MainActivity, tapping the
+        // launcher again creates a new StartupActivity on top of the existing
+        // task unless we dismiss this warm-launch instance immediately.
+        if (!isTaskRoot) {
+            finish()
+            return
+        }
+
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER

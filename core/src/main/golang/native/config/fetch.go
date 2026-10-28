@@ -19,6 +19,7 @@ import (
 	"github.com/metacubex/mihomo/adapter/provider"
 	clashCa "github.com/metacubex/mihomo/component/ca"
 	clashHttp "github.com/metacubex/mihomo/component/http"
+	clashConfig "github.com/metacubex/mihomo/config"
 	RB "github.com/metacubex/mihomo/rules/bundle"
 	"github.com/metacubex/tls"
 )
@@ -189,6 +190,9 @@ func FetchAndValid(
 		}
 
 		reportSubscriptionInfo(header, reportStatus)
+		if profile, readErr := os.ReadFile(configPath); readErr == nil {
+			_ = os.WriteFile(configPath+".origin.yaml", profile, 0600)
+		}
 	}
 
 	defer runtime.GC()
@@ -260,6 +264,20 @@ func FetchAndValid(
 	reportStatus(string(bytes))
 
 	cfg, err := Parse(rawCfg)
+	if err != nil && restoreDdnsOriginal(configPath) {
+		configData, readErr := os.ReadFile(configPath)
+		if readErr != nil {
+			err = readErr
+		} else {
+			rawCfg, err = clashConfig.UnmarshalRawConfig(configData)
+		}
+		if err == nil {
+			err = process(rawCfg, path)
+		}
+		if err == nil {
+			cfg, err = Parse(rawCfg)
+		}
+	}
 	if err != nil {
 		return err
 	}

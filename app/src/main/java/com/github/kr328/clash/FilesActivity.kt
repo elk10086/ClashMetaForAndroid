@@ -9,7 +9,6 @@ import android.net.Uri
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import com.github.kr328.clash.common.util.grantPermissions
 import com.github.kr328.clash.common.util.ticker
 import com.github.kr328.clash.common.util.uuid
 import com.github.kr328.clash.design.FilesDesign
@@ -25,6 +24,8 @@ import java.util.concurrent.TimeUnit
 
 class FilesActivity : BaseActivity<FilesDesign>() {
     override suspend fun main() {
+        if (!canViewConfigurationModule()) return finish()
+
         val uuid = intent.uuid ?: return finish()
         val profile = withProfile { queryByUUID(uuid) } ?: return finish()
         val root = uuid.toString()
@@ -64,12 +65,10 @@ class FilesActivity : BaseActivity<FilesDesign>() {
                                 stack.push(it.file.id)
                             }
                             is FilesDesign.Request.OpenFile -> {
-                                startActivityForResult(
-                                    ActivityResultContracts.StartActivityForResult(),
-                                    Intent(Intent.ACTION_VIEW).setDataAndType(
-                                        client.buildDocumentUri(it.file.id),
-                                        "text/plain"
-                                    ).grantPermissions()
+                                startActivity(
+                                    Intent(this@FilesActivity, YamlPreviewActivity::class.java)
+                                        .setData(client.buildDocumentUri(it.file.id))
+                                        .putExtra(YamlPreviewActivity.EXTRA_NAME, it.file.name),
                                 )
                             }
                             is FilesDesign.Request.DeleteFile -> {

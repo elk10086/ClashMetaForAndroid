@@ -8,6 +8,7 @@ class FileDocument(
     override val flags: Set<Flag>,
     private val idOverride: String? = null,
     private val nameOverride: String? = null,
+    private val sizeOverride: Long? = null,
 ) : Document {
     override val id: String
         get() = idOverride ?: file.name
@@ -16,7 +17,7 @@ class FileDocument(
     override val mimeType: String
         get() = if (file.isDirectory) DocumentsContract.Document.MIME_TYPE_DIR else "text/plain"
     override val size: Long
-        get() = file.length()
+        get() = sizeOverride ?: file.length()
     override val updatedAt: Long
         get() = file.lastModified()
 }

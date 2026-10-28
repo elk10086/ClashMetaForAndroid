@@ -36,6 +36,8 @@ class NewProfileActivity : BaseActivity<NewProfileDesign>() {
     private val scanLauncher = registerForActivityResult(ScanQRCode(), ::scanResultHandler)
 
     override suspend fun main() {
+        if (!canViewConfigurationModule()) return finish()
+
         val design = NewProfileDesign(this)
 
         design.patchProviders(queryProfileProviders())

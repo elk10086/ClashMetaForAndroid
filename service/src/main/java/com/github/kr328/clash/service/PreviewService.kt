@@ -12,12 +12,13 @@ import com.github.kr328.clash.service.clash.module.StaticNotificationModule
 import com.github.kr328.clash.service.clash.module.SuspendModule
 import com.github.kr328.clash.service.clash.module.TimeZoneModule
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 
 /** Loads the active profile for browsing/selecting proxy groups without starting a VPN. */
-class PreviewService : BaseService() {
+class PreviewService : RuntimeService() {
     private val runtime = clashRuntime {
         val config = install(ConfigurationModule(this@PreviewService))
         val network = install(NetworkObserveModule(this@PreviewService))
@@ -33,10 +34,14 @@ class PreviewService : BaseService() {
                 }
                 if (quit) break
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("Create preview runtime: ${e.message}", e)
         } finally {
-            withContext(NonCancellable) { stopSelf() }
+            withContext(NonCancellable) {
+                if (this@PreviewService.isActive) stopSelf()
+            }
         }
     }
 
@@ -44,9 +49,18 @@ class PreviewService : BaseService() {
         super.onCreate()
         StaticNotificationModule.createNotificationChannel(this)
         StaticNotificationModule.notifyLoadingNotification(this)
+        if (StatusProvider.serviceRunning) {
+            stopSelf()
+            return
+        }
         runtime.launch()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        StaticNotificationModule.notifyLoadingNotification(this)
+        if (StatusProvider.serviceRunning) stopSelf(startId)
+        // A preview belongs to the visible client, not a VPN that should restart itself.
+        return START_NOT_STICKY
+    }
     override fun onBind(intent: Intent?): IBinder = Binder()
 }

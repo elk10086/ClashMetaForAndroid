@@ -79,6 +79,10 @@
     <string name="should_not_be_blank">Should not be blank</string>
     <string name="detail">Detail</string>
     <string name="update">Update</string>
+    <string name="cloud_update_subscription">Update subscription</string>
+    <string name="cloud_update_subscription_confirm_message">Download the latest subscription and refresh the line list? Your connection may briefly pause while the update is applied.</string>
+    <string name="cloud_update_subscription_success">Subscription updated</string>
+    <string name="cloud_update_subscription_failure">Subscription update failed: %s</string>
     <string name="edit">Edit</string>
     <string name="delete">Delete</string>
     <string name="export">Export</string>
@@ -112,7 +116,7 @@
     <string name="cancel">Cancel</string>
     <string name="reset">Reset</string>
 
-    <string name="clash_logcat">Clash Logcat</string>
+    <string name="clash_logcat">App logs</string>
     <string name="history">History</string>
     <string name="logcat">Logcat</string>
 
@@ -126,7 +130,7 @@
     <string name="override">Override</string>
 
     <string name="auto_restart">Auto Restart</string>
-    <string name="allow_clash_auto_restart">Allow clash auto restart</string>
+    <string name="allow_clash_auto_restart">Allow app auto restart</string>
 
     <string name="route_system_traffic">Route System Traffic</string>
     <string name="routing_via_vpn_service">Auto routing all system traffic via VpnService</string>
@@ -148,7 +152,7 @@
     <string name="access_control_packages">Access Control Packages</string>
     <string name="access_control_packages_summary">Configure access permission for apps</string>
 
-    <string name="options_unavailable">Options Unavailable until Clash Stopped</string>
+    <string name="options_unavailable">Options unavailable while the service is running</string>
 
     <string name="general">General</string>
     <string name="dns">DNS</string>
@@ -225,7 +229,7 @@
     <string name="import_from_clipboard">Import from Clipboard</string>
     <string name="export_to_clipboard">Export to Clipboard</string>
 
-    <string name="clash_meta_for_android">Clash Meta for Android</string>
+    <string name="clash_meta_for_android">@string/application_name</string>
 
     <string name="document">Document</string>
     <string name="feedback">Feedback</string>
@@ -239,7 +243,7 @@
     <string name="meta_github_url" translatable="false">https://github.com/MetaCubeX/ClashMetaForAndroid</string>
     <string name="clash_meta_core_url" translatable="false">https://github.com/MetaCubeX/Clash.Meta</string>
 
-    <string name="tips_properties"><![CDATA[Accept Only <strong>Clash Config</strong>(including <strong>Proxy</strong>/<strong>Rules</strong>)]]></string>
+    <string name="tips_properties"><![CDATA[Accept only <strong>app configurations</strong> containing <strong>proxies</strong> and <strong>rules</strong>]]></string>
     <string name="tips_help"><![CDATA[Clash Meta for Android is a <strong>freeware</strong> and we do <strong>NOT</strong> provide any service for it]]></string>
 
     <string name="google_play_url" translatable="false">https://play.google.com/store/apps/details?id=com.github.kr328.clash</string>
@@ -274,6 +278,8 @@
     <string name="not_selectable">Not Selectable</string>
     <string name="cloud_proxy_group_not_selectable_tips">“%1$s” selects lines automatically, so lines cannot be changed here. To choose a line yourself, open: %2$s</string>
     <string name="cloud_proxy_group_no_selectable_tips">“%1$s” selects lines automatically. This subscription does not provide a group where you can choose a line manually.</string>
+    <string name="cloud_auto_select_tips">Automatic selection enabled. The app will select an available line based on latency.</string>
+    <string name="cloud_fallback_tips">Failover enabled. The app will switch to an available line when the current line is unavailable.</string>
 
     <string name="providers">Providers</string>
 
@@ -357,8 +363,8 @@
     <string name="toast_profile_updated_complete">Update profile %s completed</string>
     <string name="toast_profile_updated_failed">Update profile %1$s failed: %2$s</string>
     <string name="external_control_activity">External Control</string>
-    <string name="external_control_started">Clash.Meta service started</string>
-    <string name="external_control_stopped">Clash.Meta service stopped</string>
+    <string name="external_control_started">Service started</string>
+    <string name="external_control_stopped">Service stopped</string>
 
     <string name="hide_app_icon_title">Hide App Icon</string>
     <string name="hide_app_icon_desc">You can dial *#*#252746382#*#* to open this App</string>
@@ -367,12 +373,12 @@
     <string name="import_from_qr_no_permission">Camera access is restricted. Please enable it in Settings.</string>
     <string name="import_from_qr_exception">An unhandled system exception occurred.</string>
 
-    <string name="shortcut_toggle_short">Toggle Clash</string>
-    <string name="shortcut_toggle_long">Toggle Clash service on/off</string>
-    <string name="shortcut_start_short">Start Clash</string>
-    <string name="shortcut_start_long">Start Clash service</string>
-    <string name="shortcut_stop_short">Stop Clash</string>
-    <string name="shortcut_stop_long">Stop Clash service</string>
+    <string name="shortcut_toggle_short">Toggle service</string>
+    <string name="shortcut_toggle_long">Toggle app service on/off</string>
+    <string name="shortcut_start_short">Start service</string>
+    <string name="shortcut_start_long">Start app service</string>
+    <string name="shortcut_stop_short">Stop service</string>
+    <string name="shortcut_stop_long">Stop app service</string>
     <string name="cloud_login">Sign in</string>
     <string name="cloud_membership">Membership</string>
     <string name="cloud_membership_loading">Loading membership…</string>
@@ -396,7 +402,7 @@
     <string name="cloud_auth_reset_submit">Reset password</string>
     <string name="cloud_official_site">Stay connected: zhuiyun.one</string>
     <string name="cloud_create_account">Create account</string>
-    <string name="cloud_current_version">Current version: v%1$s</string>
+    <string name="cloud_current_version">Current version: %1$s</string>
     <string name="cloud_invalid_email">Enter a valid email address</string>
     <string name="cloud_password_short">Password must contain at least 6 characters</string>
     <string name="cloud_reset_question">Can’t sign in?</string>
@@ -440,4 +446,14 @@
     <string name="cloud_lines_connect_first">Start the connection to load lines</string>
     <string name="cloud_lines_preparing">Preparing lines. They will open automatically</string>
     <string name="cloud_lines_still_loading">Lines are still loading. Please try again shortly</string>
+    <string name="cloud_plan_expired_title">Plan expired</string>
+    <string name="cloud_plan_expired_hint">Your plan has expired. Line downloads are paused. Renew your plan, then refresh its status.</string>
+    <string name="cloud_plan_renew_action">Renew now</string>
+    <string name="cloud_plan_refresh_action">Already renewed? Refresh</string>
+    <string name="cloud_plan_refreshing">Refreshing plan status…</string>
+    <string name="cloud_plan_still_expired">The plan is still expired</string>
+    <string name="cloud_plan_refreshed">Plan status updated</string>
+    <string name="cloud_plan_expiring_warning">Your plan expires in less than 3 days. Please renew soon.</string>
+    <string name="cloud_plan_low_traffic_warning">Less than 3GB of data remains. Please purchase a plan soon.</string>
+    <string name="cloud_plan_traffic_exhausted_warning">Your data allowance is exhausted. Please purchase a plan.</string>
 </resources>

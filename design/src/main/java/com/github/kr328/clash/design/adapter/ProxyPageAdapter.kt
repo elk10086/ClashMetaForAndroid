@@ -33,7 +33,7 @@ class ProxyPageAdapter(
         links: Map<String, ProxyState>
     ) {
         val states = withContext(Dispatchers.Default) {
-            proxies.map {
+            proxies.withPinnedStrategies().map {
                 val link = if (it.isGroup) links[it.name] else null
 
                 ProxyViewState(config, it, parent, link)
@@ -60,8 +60,15 @@ class ProxyPageAdapter(
 
         val toolbarHeight = config.context.getPixels(R.dimen.toolbar_height)
         val tabHeight = config.context.getPixels(R.dimen.tab_layout_height)
+        val pagePadding = config.context.getPixels(R.dimen.proxy_content_padding)
 
-        holder.recyclerView.bindInsets(surface, toolbarHeight + tabHeight)
+        holder.recyclerView.bindInsets(
+            surface = surface,
+            top = toolbarHeight + tabHeight + pagePadding,
+            bottom = config.context.getPixels(R.dimen.item_tailing_component_size) + pagePadding * 3,
+            start = pagePadding,
+            end = pagePadding,
+        )
         holder.recyclerView.addScrolledToBottomObserver { view, bottom ->
             val position = view.position
             val state = states[position]

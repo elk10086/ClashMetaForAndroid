@@ -1,6 +1,8 @@
 package tunnel
 
 import (
+	"encoding/json"
+	"net"
 	"sort"
 	"strings"
 
@@ -25,9 +27,56 @@ type Proxy struct {
 	Name     string `json:"name"`
 	Title    string `json:"title"`
 	Subtitle string `json:"subtitle"`
+	Server   string `json:"server"`
 	Type     string `json:"type"`
 	Delay    int    `json:"delay"`
 	IsGroup  bool   `json:"isGroup"`
+}
+
+func proxyServer(proxy C.Proxy) string {
+	address := strings.TrimSpace(proxy.Addr())
+	if address == "" {
+		return ""
+	}
+
+	host, _, err := net.SplitHostPort(address)
+	if err == nil {
+		return strings.Trim(host, "[]")
+	}
+
+	return strings.Trim(address, "[]")
+}
+
+func proxyDelay(proxy C.Proxy, testURL string) int {
+	state, tested := proxy.ExtraDelayHistories()[testURL]
+	if !tested || len(state.History) == 0 {
+		return 0
+	}
+
+	last := state.History[len(state.History)-1]
+	if !state.Alive || last.Delay == 0 {
+		return -1
+	}
+
+	return int(last.Delay)
+}
+
+func proxyGroupTestURL(group outboundgroup.ProxyGroup) string {
+	// Group implementations already expose their configured health-check URL
+	// through MarshalJSON. Read that value here without duplicating a concrete
+	// type switch for every group implementation.
+	var metadata struct {
+		TestURL string `json:"testUrl"`
+	}
+	if payload, err := group.MarshalJSON(); err == nil {
+		if err := json.Unmarshal(payload, &metadata); err == nil {
+			if testURL := strings.TrimSpace(metadata.TestURL); testURL != "" {
+				return testURL
+			}
+		}
+	}
+
+	return C.DefaultTestURL
 }
 
 type ProxyGroup struct {
@@ -98,7 +147,10 @@ func QueryProxyGroup(name string, sortMode SortMode, uiSubtitlePattern *regexp2.
 		return nil
 	}
 
-	proxies := convertProxies(g.Proxies(), uiSubtitlePattern)
+	// The group owns the URL used to health-check all of its members. Use it
+	// consistently instead of picking an arbitrary key from each proxy's
+	// delay-history map (Go map iteration order is intentionally random).
+	proxies := convertProxies(g.Proxies(), proxyGroupTestURL(g), uiSubtitlePattern)
 	// 	proxies := collectProviders(g.Providers(), uiSubtitlePattern)
 
 	switch sortMode {
@@ -156,6 +208,7 @@ func PatchSelector(selector, name string) bool {
 
 	if err := s.Set(name); err != nil {
 		log.Warnln("Patch selector `%s`: %s", selector, err.Error())
+		return false
 	}
 
 	log.Infoln("Patch selector %s -> %s", selector, name)
@@ -165,7 +218,7 @@ func PatchSelector(selector, name string) bool {
 	return true
 }
 
-func convertProxies(proxies []C.Proxy, uiSubtitlePattern *regexp2.Regexp) []*Proxy {
+func convertProxies(proxies []C.Proxy, testURL string, uiSubtitlePattern *regexp2.Regexp) []*Proxy {
 	result := make([]*Proxy, 0, 128)
 
 	for _, p := range proxies {
@@ -183,28 +236,22 @@ func convertProxies(proxies []C.Proxy, uiSubtitlePattern *regexp2.Regexp) []*Pro
 				}
 			}
 		}
-		testURL := "https://www.gstatic.com/generate_204"
-		for k := range p.ExtraDelayHistories() {
-			if len(k) > 0 {
-				testURL = k
-				break
-			}
-		}
 		_, isGroup := p.Adapter().(outboundgroup.ProxyGroup)
 
 		result = append(result, &Proxy{
 			Name:     name,
 			Title:    strings.TrimSpace(title),
 			Subtitle: strings.TrimSpace(subtitle),
+			Server:   proxyServer(p),
 			Type:     p.Type().String(),
-			Delay:    int(p.LastDelayForTestUrl(testURL)),
+			Delay:    proxyDelay(p, testURL),
 			IsGroup:  isGroup,
 		})
 	}
 	return result
 }
 
-func collectProviders(providers []provider.ProxyProvider, uiSubtitlePattern *regexp2.Regexp) []*Proxy {
+func collectProviders(providers []provider.ProxyProvider, testURL string, uiSubtitlePattern *regexp2.Regexp) []*Proxy {
 	result := make([]*Proxy, 0, 128)
 
 	for _, p := range providers {
@@ -224,21 +271,15 @@ func collectProviders(providers []provider.ProxyProvider, uiSubtitlePattern *reg
 				}
 			}
 
-			testURL := "https://www.gstatic.com/generate_204"
-			for k := range px.ExtraDelayHistories() {
-				if len(k) > 0 {
-					testURL = k
-					break
-				}
-			}
 			_, isGroup := px.Adapter().(outboundgroup.ProxyGroup)
 
 			result = append(result, &Proxy{
 				Name:     name,
 				Title:    strings.TrimSpace(title),
 				Subtitle: strings.TrimSpace(subtitle),
+				Server:   proxyServer(px),
 				Type:     px.Type().String(),
-				Delay:    int(px.LastDelayForTestUrl(testURL)),
+				Delay:    proxyDelay(px, testURL),
 				IsGroup:  isGroup,
 			})
 		}

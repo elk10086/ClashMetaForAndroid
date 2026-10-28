@@ -4,20 +4,20 @@
     <string name="toast_profile_updated_complete">Cập nhật thành công %s</string>
     <string name="toast_profile_updated_failed">Cập nhật không thành công %1$s %2$s</string>
     <string name="press_to_import">Chạm để nhập...</string>
-    <string name="meta_features">Tính năng của Clash Meta</string>
+    <string name="meta_features">Tính năng Meta</string>
     <string name="allow_ipv6">Cho phép Ipv6</string>
     <string name="allow_ipv6_summary">Cho phép lưu lượng ipv6 qua hệ thống Vpn</string>
     <string name="tun_stack_gvisor">Gvisor</string>
     <string name="tun_stack_mixed">Mixed</string>
     <string name="tun_stack_mode">Chế độ xếp chồng dữ liệu</string>
     <string name="tun_stack_system">Hệ thống</string>
-    <string name="application_name_alpha">Clash Meta</string>
-    <string name="application_name_meta">Clash Meta</string>
+    <string name="application_name_alpha">ZY</string>
+    <string name="application_name_meta">ZY</string>
     <string name="clash_meta_core">Clash Meta Core</string>
-    <string name="clash_meta_for_android">Clash Meta</string>
+    <string name="clash_meta_for_android">@string/application_name</string>
     <string name="clash_meta_wiki">Clash Meta Wiki</string>
-    <string name="launch_name_alpha">Clash Meta</string>
-    <string name="launch_name_meta">Clash Meta</string>
+    <string name="launch_name_alpha">ZY</string>
+    <string name="launch_name_meta">ZY</string>
     <string name="_new">Mới</string>
     <string name="about">Thông tin</string>
     <string name="accept_http_content">Chỉ chấp nhận http(s)</string>
@@ -39,7 +39,7 @@
     <string name="allow_all_apps">Cho phép tất cả các ứng dụng</string>
     <string name="allow_bypass">Cho phép bỏ qua</string>
     <string name="allow_bypass_summary">Cho phép tất cả các ứng dụng bỏ qua kết nối VPN này</string>
-    <string name="allow_clash_auto_restart">Cho phép Clash tự khởi động lại</string>
+    <string name="allow_clash_auto_restart">Cho phép ứng dụng tự khởi động lại</string>
     <string name="allow_lan">Cho phép mạng LAN</string>
     <string name="allow_selected_apps">Cho phép các ứng dụng đã chọn</string>
     <string name="always_dark">Luôn tối</string>
@@ -63,7 +63,7 @@
     <string name="bypass_private_network">Bỏ qua mạng riêng</string>
     <string name="bypass_private_network_summary">Bỏ qua các địa chỉ mạng riêng</string>
     <string name="cancel">Huỷ bỏ</string>
-    <string name="clash_logcat">Nhật ký Clash</string>
+    <string name="clash_logcat">Nhật ký ứng dụng</string>
     <string name="close">Đóng</string>
     <string name="compatible">Tương thích</string>
     <string name="copied">Đã sao chép</string>
@@ -174,7 +174,7 @@
     <string name="not_selectable">Không thể chọn</string>
     <string name="not_selected">Trống. Nhấn vào để thêm</string>
     <string name="ok">OK</string>
-    <string name="options_unavailable">Tùy chọn không khả dụng cho đến khi Clash ngắt kết nối</string>
+    <string name="options_unavailable">Tùy chọn không khả dụng khi dịch vụ đang chạy</string>
     <string name="override">Cài đặt thêm</string>
     <string name="package_name">Tên gói</string>
     <string name="profile">Cấu hình</string>
@@ -229,7 +229,7 @@
     <string name="system_proxy_summary">Đính kèm proxy,http vào hệ thống Vpn</string>
     <string name="tap_to_start">Chạm để kết nối</string>
     <string name="tips_help">Clash Meta là một phần mềm miễn phí và chúng tôi KHÔNG cung cấp bất kỳ dịch vụ trả phí nào cho nó</string>
-    <string name="tips_properties">Chỉ chấp nhận cấu hình Clash bao gồm Proxy và Quy tắc</string>
+    <string name="tips_properties">Chỉ chấp nhận cấu hình ứng dụng bao gồm Proxy và Quy tắc</string>
     <string name="tproxy_port">Cổng TProxy</string>
     <string name="unable_to_start_vpn">Không thể khởi động thành phần VPN</string>
     <string name="unavailable">Không có sẵn</string>
@@ -250,4 +250,11 @@
     <string name="import_from_qr">Nhập từ Mã QR</string>
     <string name="import_from_qr_no_permission">Quyền truy cập camera bị hạn chế. Vui lòng bật trong Cài đặt.</string>
     <string name="import_from_qr_exception">Đã xảy ra ngoại lệ hệ thống không xử lý được.</string>
+    <string name="cloud_plan_expired_title">Gói đã hết hạn</string>
+    <string name="cloud_plan_expired_hint">Gói đã hết hạn nên việc tải tuyến đã tạm dừng. Hãy gia hạn rồi làm mới trạng thái gói.</string>
+    <string name="cloud_plan_renew_action">Gia hạn ngay</string>
+    <string name="cloud_plan_refresh_action">Đã gia hạn? Làm mới</string>
+    <string name="cloud_plan_refreshing">Đang làm mới trạng thái gói…</string>
+    <string name="cloud_plan_still_expired">Gói vẫn đang hết hạn</string>
+    <string name="cloud_plan_refreshed">Đã cập nhật trạng thái gói</string>
 </resources>

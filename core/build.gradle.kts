@@ -10,6 +10,16 @@ plugins {
 }
 
 val golangSource = file("src/main/golang/native")
+val goExecutable = sequenceOf(
+    providers.gradleProperty("goExecutable").orNull,
+    System.getenv("GO_EXECUTABLE"),
+    System.getenv("GOROOT")?.let { "$it/bin/go" },
+    "/usr/local/bin/go",
+    "/usr/local/go/bin/go",
+    "/opt/homebrew/bin/go",
+).filterNotNull()
+    .firstOrNull { file(it).canExecute() }
+    ?: "go"
 
 golang {
     sourceSets {
@@ -58,6 +68,7 @@ dependencies {
 
 afterEvaluate {
     tasks.withType(GolangBuildTask::class.java).forEach {
+        it.executable(goExecutable)
         it.inputs.dir(golangSource)
     }
 }

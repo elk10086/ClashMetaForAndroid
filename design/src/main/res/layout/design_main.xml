@@ -7,10 +7,13 @@
         <variable name="mode" type="String" />
         <variable name="profileName" type="String" />
         <variable name="lineName" type="String" />
+        <variable name="lineLoading" type="boolean" />
         <variable name="cloudPlan" type="String" />
         <variable name="cloudExpiry" type="String" />
         <variable name="cloudUsage" type="String" />
         <variable name="cloudProgress" type="int" />
+        <variable name="cloudExpired" type="boolean" />
+        <variable name="cloudWarning" type="String" />
         <variable name="networkResult" type="String" />
         <variable name="uploadSpeed" type="String" />
         <variable name="downloadSpeed" type="String" />
@@ -20,6 +23,7 @@
         <variable name="announcementUnread" type="boolean" />
         <import type="com.github.kr328.clash.design.MainDesign.Request" />
         <import type="android.view.View" />
+        <import type="android.text.TextUtils" />
     </data>
 
     <LinearLayout
@@ -78,6 +82,7 @@
                 android:paddingTop="16dp">
 
                 <LinearLayout
+                    android:id="@+id/announcement_card_view"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginBottom="12dp"
@@ -133,6 +138,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/membership_card_view"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:minHeight="112dp"
@@ -143,7 +149,8 @@
                     android:gravity="center_vertical"
                     android:onClick="@{() -> self.request(Request.OpenPlans)}"
                     android:orientation="vertical"
-                    android:padding="12dp">
+                    android:padding="12dp"
+                    android:visibility="@{cloudExpired ? View.GONE : View.VISIBLE}">
 
                     <TextView
                         android:layout_width="match_parent"
@@ -185,6 +192,115 @@
                         android:max="100"
                         android:progress="@{cloudProgress}"
                         android:progressDrawable="@drawable/cloud_usage_progress" />
+
+                    <LinearLayout
+                        android:id="@+id/membership_warning_view"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:padding="10dp"
+                        android:visibility="@{TextUtils.isEmpty(cloudWarning) ? View.GONE : View.VISIBLE}">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_cloud_plan_expired"
+                            android:tint="?attr/colorError" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:accessibilityLiveRegion="polite"
+                            android:text="@{cloudWarning}"
+                            android:textColor="?attr/colorError"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/cloud_plan_expired_card"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:visibility="@{cloudExpired ? View.VISIBLE : View.GONE}">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@string/cloud_plan_expired_title"
+                            android:src="@drawable/ic_cloud_plan_expired" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="10dp"
+                            android:layout_weight="1"
+                            android:text="@string/cloud_plan_expired_title"
+                            android:textColor="?attr/colorError"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:lineSpacingExtra="2dp"
+                        android:text="@string/cloud_plan_expired_hint"
+                        android:textColor="?attr/colorControlNormal"
+                        android:textSize="13sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="14dp"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/cloud_expired_primary_button"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:onClick="@{() -> self.request(Request.OpenPlans)}"
+                            android:text="@string/cloud_plan_renew_action"
+                            android:textColor="?attr/colorOnError"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <Space
+                            android:layout_width="10dp"
+                            android:layout_height="match_parent" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="match_parent"
+                            android:layout_weight="1"
+                            android:background="@drawable/cloud_expired_secondary_button"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center"
+                            android:onClick="@{() -> self.request(Request.RefreshMembership)}"
+                            android:paddingHorizontal="8dp"
+                            android:text="@string/cloud_plan_refresh_action"
+                            android:textColor="?attr/colorError"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <FrameLayout
@@ -216,6 +332,13 @@
                         android:padding="44dp"
                         android:src="@{clashRunning ? @drawable/cloud_pause : @drawable/cloud_play}"
                         android:tint="?attr/colorControlNormal" />
+                    <com.github.kr328.clash.design.view.PowerChargeView
+                        android:id="@+id/powerChargeView"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:clickable="false"
+                        android:importantForAccessibility="no"
+                        android:visibility="gone" />
                 </FrameLayout>
 
                 <TextView
@@ -235,6 +358,7 @@
                     android:weightSum="2">
 
                     <LinearLayout
+                        android:id="@+id/mode_card_view"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
@@ -253,6 +377,7 @@
                     <Space android:layout_width="12dp" android:layout_height="match_parent" />
 
                     <LinearLayout
+                        android:id="@+id/line_card_view"
                         android:layout_width="0dp"
                         android:layout_height="match_parent"
                         android:layout_weight="1"
@@ -265,7 +390,33 @@
                         android:orientation="vertical"
                         android:padding="14dp">
                         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/cloud_nav_lines" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{lineName}" android:textColor="?attr/colorControlNormal" android:textSize="16sp" android:textStyle="bold" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="8dp"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+                            <TextView
+                                android:id="@+id/line_name_view"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:ellipsize="end"
+                                android:maxLines="1"
+                                android:text="@{lineName}"
+                                android:textColor="?attr/colorControlNormal"
+                                android:textSize="16sp"
+                                android:textStyle="bold" />
+                            <ProgressBar
+                                android:id="@+id/line_loading_view"
+                                style="?android:attr/progressBarStyleSmall"
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:layout_marginStart="8dp"
+                                android:importantForAccessibility="no"
+                                android:indeterminateTint="?attr/colorPrimary"
+                                android:visibility="@{lineLoading ? View.VISIBLE : View.GONE}" />
+                        </LinearLayout>
                     </LinearLayout>
                 </LinearLayout>
 
@@ -275,12 +426,12 @@
                     android:layout_marginTop="12dp"
                     android:orientation="horizontal"
                     android:weightSum="2">
-                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:clickable="true" android:focusable="true" android:defaultFocusHighlightEnabled="true" android:gravity="center_vertical" android:onClick="@{() -> self.request(Request.DetectNetwork)}" android:orientation="vertical" android:padding="14dp">
+                    <LinearLayout android:id="@+id/detection_card_view" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:clickable="true" android:focusable="true" android:defaultFocusHighlightEnabled="true" android:gravity="center_vertical" android:onClick="@{() -> self.request(Request.DetectNetwork)}" android:orientation="vertical" android:padding="14dp">
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_detection" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{networkResult}" android:textColor="?attr/colorControlNormal" android:textSize="15sp" android:textStyle="bold" />
+                        <TextView android:id="@+id/network_result_view" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:ellipsize="end" android:maxLines="1" android:text="@{networkResult}" android:textColor="?attr/colorControlNormal" android:textSize="15sp" android:textStyle="bold" />
                     </LinearLayout>
                     <Space android:layout_width="12dp" android:layout_height="match_parent" />
-                    <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:gravity="center_vertical" android:orientation="vertical" android:padding="14dp">
+                    <LinearLayout android:id="@+id/speed_card_view" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:background="@drawable/cloud_dashboard_card" android:gravity="center_vertical" android:orientation="vertical" android:padding="14dp">
                         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/cloud_dashboard_speed" android:textColor="?attr/colorControlNormal" android:alpha="0.65" android:textSize="12sp" />
                         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
                             <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:ellipsize="end" android:maxLines="1" android:text='@{"↑ " + uploadSpeed}' android:textColor="?attr/colorControlNormal" android:textSize="13sp" android:textStyle="bold" />

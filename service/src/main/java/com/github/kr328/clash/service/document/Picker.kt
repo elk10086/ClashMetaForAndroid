@@ -3,6 +3,7 @@ package com.github.kr328.clash.service.document
 import android.content.Context
 import android.provider.DocumentsContract
 import com.github.kr328.clash.service.R
+import com.github.kr328.clash.service.ProfileStorage
 import com.github.kr328.clash.service.data.ImportedDao
 import com.github.kr328.clash.service.data.Pending
 import com.github.kr328.clash.service.data.PendingDao
@@ -82,16 +83,20 @@ class Picker(private val context: Context) {
                     emptySet()
                 else
                     setOf(Flag.Writable)
+                val file = when {
+                    pending != null -> context.pendingDir.resolve(pending.uuid.toString())
+                    imported != null -> context.importedDir.resolve(imported.uuid.toString())
+                    else -> throw FileNotFoundException("profile not found")
+                }.resolve("config.yaml")
 
                 return FileDocument(
-                    file = when {
-                        pending != null -> context.pendingDir.resolve(pending.uuid.toString())
-                        imported != null -> context.importedDir.resolve(imported.uuid.toString())
-                        else -> throw FileNotFoundException("profile not found")
-                    }.resolve("config.yaml"),
+                    file = file,
                     flags = flags,
                     idOverride = Paths.CONFIGURATION_ID,
-                    nameOverride = context.getString(R.string.configuration_yaml)
+                    nameOverride = context.getString(R.string.configuration_yaml),
+                    sizeOverride = runCatching {
+                        ProfileStorage.read(file, context).size.toLong()
+                    }.getOrNull(),
                 )
             } else {
                 return FileDocument(

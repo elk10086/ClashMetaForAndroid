@@ -16,7 +16,7 @@
         <item name="colorPrimary">@color/color_clash_light</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
-        <item name="colorOutline">#1A000000</item>
+        <item name="colorOutline">#10000000</item>
         <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
@@ -41,7 +41,7 @@
         <item name="colorPrimary">@color/color_clash_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
-        <item name="colorOutline">#24FFFFFF</item>
+        <item name="colorOutline">#18FFFFFF</item>
         <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
         <item name="android:windowBackground">@color/color_dark_background</item>
@@ -73,7 +73,7 @@
         <item name="colorPrimary">@color/color_clash_light</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
-        <item name="colorOutline">#1A000000</item>
+        <item name="colorOutline">#10000000</item>
         <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
@@ -96,7 +96,7 @@
         <item name="colorPrimary">@color/color_clash_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
-        <item name="colorOutline">#24FFFFFF</item>
+        <item name="colorOutline">#18FFFFFF</item>
         <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
 
@@ -128,7 +128,7 @@
         <item name="colorPrimary">@color/color_clash_light</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorControlNormal">@android:color/black</item>
-        <item name="colorOutline">#1A000000</item>
+        <item name="colorOutline">#10000000</item>
         <item name="android:textColorHint">#73000000</item>
         <item name="colorClashStopped">@color/color_light_clash_stopped</item>
         <item name="colorControlDisabled">@color/color_light_control_disabled</item>
@@ -152,7 +152,7 @@
         <item name="colorPrimary">@color/color_clash_dark</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSurface">@color/color_dark_surface</item>
-        <item name="colorOutline">#24FFFFFF</item>
+        <item name="colorOutline">#18FFFFFF</item>
         <item name="android:textColorHint">#8AFFFFFF</item>
         <item name="colorControlNormal">@android:color/white</item>
         <item name="colorControlDisabled">@color/color_dark_control_disabled</item>
@@ -188,11 +188,17 @@
     </style>
 
     <style name="CloudThemeSakura">
+        <item name="textAppearanceHeadline6">@style/SakuraTextHeading</item>
+        <item name="textAppearanceBody1">@style/SakuraTextBody</item>
+        <item name="textAppearanceBody2">@style/SakuraTextSecondary</item>
+        <item name="textAppearanceButton">@style/SakuraTextButton</item>
         <item name="colorPrimary">@color/theme_sakura</item>
         <item name="colorSecondary">@color/theme_sakura</item>
-        <item name="colorOnPrimary">#FF121212</item>
+        <item name="colorOnPrimary">#FFFFFFFF</item>
         <item name="android:fontFamily">@font/skin_sakura</item>
         <item name="fontFamily">@font/skin_sakura</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="android:textScaleX">1</item>
     </style>
 
     <style name="CloudThemeGod">
@@ -239,20 +245,58 @@
         <item name="colorControlHighlight">#33FFFFFF</item>
     </style>
     <style name="CloudThemeSakuraLight" parent="CloudThemeSakura">
-        <item name="android:windowBackground">#FFFFF7FA</item>
-        <item name="colorSurface">#FFFFEDF4</item>
-        <item name="colorControlNormal">#FF4A2633</item>
-        <item name="colorOnSurface">#FF4A2633</item>
-        <item name="android:textColor">#FF4A2633</item>
-        <item name="colorControlHighlight">#26FFB3C9</item>
+        <item name="bottomSheetDialogTheme">@style/CloudSakuraBottomSheetLight</item>
+        <item name="fullScreenDialogTheme">@style/CloudSakuraFullScreenLight</item>
+        <item name="android:windowBackground">@color/sakura_light_background</item>
+        <item name="colorSurface">@color/sakura_light_surface</item>
+        <item name="colorSurfaceVariant">@color/sakura_light_surface_variant</item>
+        <item name="colorSecondary">@color/sakura_light_secondary</item>
+        <item name="colorOnSecondary">#FFFFFFFF</item>
+        <item name="colorSecondaryContainer">@color/sakura_light_selected</item>
+        <item name="colorOnSecondaryContainer">@color/sakura_light_on_selected</item>
+        <item name="colorControlNormal">@color/sakura_light_text</item>
+        <item name="colorOnSurface">@color/sakura_light_text</item>
+        <item name="colorOnSurfaceVariant">@color/sakura_light_muted</item>
+        <item name="colorOutline">@color/sakura_light_outline</item>
+        <item name="colorClashStopped">@color/sakura_light_muted</item>
+        <item name="colorControlDisabled">#FFCDB8C1</item>
+        <item name="android:textColor">@color/sakura_light_text</item>
+        <item name="android:textColorPrimary">@color/sakura_light_text</item>
+        <item name="android:textColorSecondary">@color/sakura_light_muted</item>
+        <item name="android:textColorHint">@color/sakura_light_hint</item>
+        <item name="colorError">#FFB32644</item>
+        <item name="colorOnError">#FFFFFFFF</item>
+        <item name="colorControlHighlight">#18A34F69</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/sakura_light_surface</item>
     </style>
     <style name="CloudThemeSakuraDark" parent="CloudThemeSakura">
-        <item name="android:windowBackground">#FF171013</item>
-        <item name="colorSurface">#FF241A1E</item>
-        <item name="colorControlNormal">#FFFFE3EC</item>
-        <item name="colorOnSurface">#FFFFE3EC</item>
-        <item name="android:textColor">#FFFFE3EC</item>
-        <item name="colorControlHighlight">#40FFB3C9</item>
+        <item name="bottomSheetDialogTheme">@style/CloudSakuraBottomSheetDark</item>
+        <item name="fullScreenDialogTheme">@style/CloudSakuraFullScreenDark</item>
+        <item name="colorPrimary">@color/sakura_dark_primary</item>
+        <item name="colorOnPrimary">@color/sakura_dark_on_primary</item>
+        <item name="android:windowBackground">@color/sakura_dark_background</item>
+        <item name="colorSurface">@color/sakura_dark_surface</item>
+        <item name="colorSurfaceVariant">@color/sakura_dark_surface_variant</item>
+        <item name="colorSecondary">@color/sakura_dark_muted</item>
+        <item name="colorOnSecondary">@color/sakura_dark_on_primary</item>
+        <item name="colorSecondaryContainer">@color/sakura_dark_selected</item>
+        <item name="colorOnSecondaryContainer">@color/sakura_dark_on_selected</item>
+        <item name="colorControlNormal">@color/sakura_dark_text</item>
+        <item name="colorOnSurface">@color/sakura_dark_text</item>
+        <item name="colorOnSurfaceVariant">@color/sakura_dark_muted</item>
+        <item name="colorOutline">@color/sakura_dark_outline</item>
+        <item name="colorClashStopped">@color/sakura_dark_hint</item>
+        <item name="colorControlDisabled">#FF6E5561</item>
+        <item name="android:textColor">@color/sakura_dark_text</item>
+        <item name="android:textColorPrimary">@color/sakura_dark_text</item>
+        <item name="android:textColorSecondary">@color/sakura_dark_muted</item>
+        <item name="android:textColorHint">@color/sakura_dark_hint</item>
+        <item name="colorError">#FFFFB3B8</item>
+        <item name="colorOnError">#FF650020</item>
+        <item name="colorControlHighlight">#26E7A5BA</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/sakura_dark_surface</item>
     </style>
     <style name="CloudThemeGodLight" parent="CloudThemeGod">
         <item name="android:windowBackground">#FFF4FAFD</item>

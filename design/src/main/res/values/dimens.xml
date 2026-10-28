@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <dimen name="input_hint_text_size">13sp</dimen>
     <!-- Common -->
     <dimen name="divider_size">0.5dp</dimen>
 
@@ -64,14 +65,16 @@
     <dimen name="main_top_banner_height">90dp</dimen>
 
     <!--  Proxy Design -->
-    <dimen name="proxy_layout_padding">3dp</dimen>
-    <dimen name="proxy_content_padding">15dp</dimen>
+    <dimen name="proxy_layout_padding">4dp</dimen>
+    <dimen name="proxy_content_padding">12dp</dimen>
     <dimen name="proxy_content_padding_grid3">12dp</dimen>
     <dimen name="proxy_text_margin">10dp</dimen>
     <dimen name="proxy_text_margin_grid3">5dp</dimen>
-    <dimen name="proxy_text_size">12sp</dimen>
-    <dimen name="proxy_text_size_grid3">11sp</dimen>
-    <dimen name="proxy_card_radius">5dp</dimen>
+    <dimen name="proxy_text_size">13sp</dimen>
+    <dimen name="proxy_text_size_grid3">12sp</dimen>
+    <dimen name="proxy_secondary_text_size">11sp</dimen>
+    <dimen name="proxy_delay_text_size">12sp</dimen>
+    <dimen name="proxy_card_radius">14dp</dimen>
     <dimen name="proxy_card_offset">0dp</dimen>
 
     <!-- Properties Design -->
